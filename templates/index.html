@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音声アノテーションツール - TextGrid生成</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 12px 20px;
+            background: #f5f5f5;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-input-label:hover {
+            background: #e8e8e8;
+            border-color: #667eea;
+        }
+
+        .file-input-label.has-file {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            border-style: solid;
+        }
+
+        .file-name {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        button[type=submit] {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button[type=submit]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button[type=submit]:active {
+            transform: translateY(0);
+        }
+
+        button[type=submit]:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .message.active {
+            display: block;
+        }
+
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef5350;
+        }
+
+        .message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #66bb6a;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .info-box h3 {
+            color: #1976d2;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .info-box li {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ 音声アノテーションツール</h1>
+        <p class="subtitle">テキストと音声から分節音レベルのTextGridを生成</p>
+
+        <div class="info-box">
+            <h3>📝 使い方</h3>
+            <ul>
+                <li>朗読されるテキストを入力してください</li>
+                <li>音声ファイル（WAV, MP3, FLAC等）をアップロードしてください</li>
+                <li>「TextGridを生成」ボタンをクリックすると、音素レベルのアノテーションが付いたTextGridファイルがダウンロードされます</li>
+                <li>生成されたTextGridファイルはPraatなどの音声分析ソフトで開くことができます</li>
+            </ul>
+        </div>
+
+        <form id="annotationForm">
+            <div class="form-group">
+                <label for="text">朗読テキスト</label>
+                <textarea
+                    id="text"
+                    name="text"
+                    placeholder="ここに朗読されたテキストを入力してください。&#10;例：こんにちは。今日は良い天気ですね。"
+                    required
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="audio">音声ファイル</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="audio" name="audio" accept="audio/*" required>
+                    <label for="audio" class="file-input-label" id="fileLabel">
+                        📁 音声ファイルを選択してください
+                    </label>
+                </div>
+                <div class="file-name" id="fileName"></div>
+            </div>
+
+            <button type="submit" id="submitBtn">TextGridを生成</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>処理中です。しばらくお待ちください...</p>
+        </div>
+
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('annotationForm');
+        const audioInput = document.getElementById('audio');
+        const fileLabel = document.getElementById('fileLabel');
+        const fileName = document.getElementById('fileName');
+        const loading = document.getElementById('loading');
+        const message = document.getElementById('message');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // ファイル選択時の処理
+        audioInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                fileLabel.textContent = '✅ ' + file.name;
+                fileLabel.classList.add('has-file');
+                fileName.textContent = `ファイルサイズ: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            } else {
+                fileLabel.textContent = '📁 音声ファイルを選択してください';
+                fileLabel.classList.remove('has-file');
+                fileName.textContent = '';
+            }
+        });
+
+        // フォーム送信処理
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData();
+            formData.append('text', document.getElementById('text').value);
+            formData.append('audio', audioInput.files[0]);
+
+            // UI更新
+            loading.classList.add('active');
+            message.classList.remove('active');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '処理に失敗しました');
+                }
+
+                // TextGridファイルをダウンロード
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = audioInput.files[0].name.replace(/\.[^/.]+$/, '') + '.TextGrid';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // 成功メッセージ
+                message.textContent = '✅ TextGridファイルが生成されました！ダウンロードが開始されます。';
+                message.className = 'message success active';
+
+            } catch (error) {
+                message.textContent = '❌ エラー: ' + error.message;
+                message.className = 'message error active';
+            } finally {
+                loading.classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
