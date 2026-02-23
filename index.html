@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ワーキングサポート新城 - Working Support Shinjo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#6fa8a3", // Muted teal from flyer
+                        secondary: "#a3c8a5", // Soft green from flyer
+                        accent: "#f4a261", // Warm accent
+                        "background-light": "#fdfdfd", // Very light off-white
+                        "background-dark": "#1f2937", // Dark gray for dark mode
+                        "paper-light": "#f0f9f8", // Light teal tint for sections
+                        "paper-dark": "#374151", // Darker gray for card backgrounds
+                        "text-main": "#333333",
+                        "text-light": "#e5e7eb",
+                    },
+                    fontFamily: {
+                        display: ["'Zen Maru Gothic'", "sans-serif"],
+                        body: ["'Zen Maru Gothic'", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        'xl': "1rem",
+                        '2xl': "1.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+        }.leaf-pattern {
+            background-image: radial-gradient(#a3c8a5 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.1;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-main dark:text-text-light transition-colors duration-300">
+<nav class="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur shadow-sm border-b border-gray-100 dark:border-gray-800">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16 items-center">
+<div class="flex items-center gap-2">
+<span class="material-icons-round text-primary text-3xl">spa</span>
+<span class="font-bold text-xl tracking-wide text-gray-800 dark:text-white">ワーキングサポート新城</span>
+</div>
+<div class="hidden md:flex space-x-8 text-sm font-medium">
+<a class="text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-primary transition" href="#about">どんなところ？</a>
+<a class="text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-primary transition" href="#schedule">一日の流れ</a>
+<a class="text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-primary transition" href="#voice">利用者の声</a>
+<a class="text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-primary transition" href="#access">アクセス</a>
+</div>
+<div class="md:hidden">
+<button class="text-gray-500 hover:text-primary dark:text-gray-300">
+<span class="material-icons-round">menu</span>
+</button>
+</div>
+</div>
+</div>
+</nav>
+<header class="relative overflow-hidden bg-gradient-to-b from-paper-light to-white dark:from-gray-800 dark:to-background-dark py-20 lg:py-32">
+<div class="absolute inset-0 leaf-pattern pointer-events-none"></div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<div class="text-center lg:text-left">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+<span class="material-icons-round text-base">verified</span>
+                        地域活動支援センター
+                    </div>
+<h1 class="text-4xl lg:text-5xl font-bold leading-tight mb-6 text-gray-800 dark:text-white">
+                        働くあなたへ<br/>
+<span class="text-primary">もうひとつの安心の場所</span>を
+                    </h1>
+<p class="text-lg text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
+                        職場でも家でもない、ほっとできる場所。<br/>
+                        「ワーキングサポート新城」は、働きながら自分のペースで過ごせる地域活動支援センターです。
+                    </p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+<a class="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-primary hover:bg-opacity-90 transition" href="#access">
+                            アクセス・お問い合わせ
+                        </a>
+<a class="inline-flex items-center justify-center px-8 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition" href="#schedule">
+                            一日の流れを見る
+                        </a>
+</div>
+</div>
+<div class="relative flex justify-center">
+<div class="relative w-80 h-80 lg:w-96 lg:h-96">
+<div class="absolute top-0 right-0 w-64 h-64 bg-secondary/30 rounded-full blur-3xl filter"></div>
+<div class="absolute bottom-0 left-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl filter"></div>
+<img alt="Bird on a branch illustration style" class="relative z-10 rounded-2xl shadow-xl transform rotate-3 hover:rotate-0 transition duration-500 object-cover w-full h-full border-4 border-white dark:border-gray-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-sKABsoawvKQaTc7n2F4naOb7nb76fNkXx-Ca8GAzPfpAv4SQQ9VDMQjvGV9endIdz7uSndKHUfl2nDGono-zP3SfaAg7KhOk5CFik1XditAdYvhOvS0mQK8RVISC1AGcWJ8M3qsouTt8CctukzGQ4APbYK2FmELODub-i8qk9sjBpJUVcSnKLhvmwqOu0E8OxQgEey4-Sji1AcNoUXFWSEUjfKm0f-bHJUIGHU1LMeGN2d3XPNj4qkabzi0L_6gfwtbzpjPbAUA"/>
+</div>
+</div>
+</div>
+</div>
+</header>
+<section class="py-20 bg-white dark:bg-background-dark relative" id="about">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="text-center mb-16">
+<h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-4 relative inline-block">
+                    ワーキングサポート新城はどんなところ？
+                    <span class="absolute -bottom-2 left-0 w-full h-1 bg-primary/50 rounded-full"></span>
+</h2>
+<p class="mt-4 text-gray-600 dark:text-gray-400">「働くこと」をテーマにした地域活動支援センターです。</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+<div class="prose prose-lg text-gray-600 dark:text-gray-300">
+<p class="mb-4">
+                        現在お仕事をしている方が自分のペースで<strong class="text-primary font-bold">安心して過ごせる場所</strong>です。<br/>
+                        お昼の食卓を囲んだり、様々なプログラムを楽しみながら活動できます。
+                    </p>
+<p class="mb-4">
+                        勤務のない平日に、<strong class="text-primary font-bold">生活リズム</strong>を崩さないように出かける場としてご利用いただくのにおすすめです。
+                    </p>
+<p>
+                        また、希望される方には、日々の仕事や生活に関するご<strong class="text-primary font-bold">相談</strong>もお受けしています。<br/>
+                        ご利用日と時間帯は、原則ご自分で決めることができます。
+                    </p>
+</div>
+<div class="bg-paper-light dark:bg-paper-dark p-8 rounded-2xl border border-primary/20">
+<h3 class="text-xl font-bold mb-4 text-primary flex items-center gap-2">
+<span class="material-icons-round">volunteer_activism</span>
+                        仕事も家庭もがんばっているあなたへ
+                    </h3>
+<p class="text-sm leading-relaxed mb-4">
+                        職場でも家でもない、ほっとできる"もうひとつの場所"があることで、ふっと肩の力が抜ける瞬間があります。<br/>
+                        わたしたちは、そんな場所でありたいと願っています。
+                    </p>
+<ul class="list-disc list-inside text-sm space-y-2 marker:text-primary">
+<li>「定着支援が終了したあとが不安」</li>
+<li>「ちょっとした愚痴を吐き出せる居場所がほしい」</li>
+</ul>
+<p class="text-sm mt-4 font-medium">そんなふうに感じている方にこそ、ぜひ一度、訪れていただけたらと思います。</p>
+</div>
+</div>
+<div class="mt-12 bg-gray-50 dark:bg-gray-800 rounded-xl p-6 flex items-start gap-4 shadow-sm">
+<span class="material-icons-round text-primary text-3xl">info</span>
+<div>
+<h4 class="font-bold text-lg mb-2 dark:text-white">利用料：無料</h4>
+<p class="text-gray-600 dark:text-gray-400 text-sm">レクやクラフトなど、活動によって参加費をいただくことがあります。</p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-paper-light dark:bg-gray-800" id="schedule">
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="text-center mb-12">
+<h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">一日の流れ</h2>
+<div class="flex justify-center gap-2 text-primary/60">
+<span class="material-icons-round text-[10px]">circle</span>
+<span class="material-icons-round text-[10px]">circle</span>
+<span class="material-icons-round text-[10px]">circle</span>
+<span class="material-icons-round text-[10px]">circle</span>
+<span class="material-icons-round text-[10px]">circle</span>
+</div>
+</div>
+<div class="relative border-l-4 border-primary/30 ml-4 md:ml-0 space-y-0">
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">10:00</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 relative hover:-translate-y-1 transition duration-300">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">開所</h3>
+<p class="text-gray-600 dark:text-gray-400 text-center mt-1">フリースペースの提供・面談など</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">12:00</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 relative hover:-translate-y-1 transition duration-300">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">昼食</h3>
+<div class="mt-3 bg-primary/5 rounded-lg p-3 text-sm flex items-start gap-3">
+<img alt="Lunch Example" class="w-16 h-16 object-cover rounded-md flex-shrink-0" src="https://drive.google.com/thumbnail?id=1C4NHD-q52mvtLYi34t18a5EI-2fIeTcQ&sz=w400"/>
+<div>
+<p class="font-bold text-primary">手作りランチ 300円</p>
+<p class="text-xs text-gray-600 dark:text-gray-400 mt-1">当日朝までのお申し込みで、炊き立てご飯と手作りのおかずを毎日ご提供しています。</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">13:00</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 relative hover:-translate-y-1 transition duration-300">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">ウォーキング・ラジオ体操</h3>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">14:00</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 relative hover:-translate-y-1 transition duration-300">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">プログラム</h3>
+<div class="flex flex-wrap justify-center gap-2 mt-2">
+<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">クラフト</span>
+<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">しごトーク</span>
+<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">レク</span>
+<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">スポーツ</span>
+<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">パソコン</span>
+<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded-md text-gray-600 dark:text-gray-300">ミニ講座</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">15:15</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 relative hover:-translate-y-1 transition duration-300">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">清掃</h3>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">15:30</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 relative hover:-translate-y-1 transition duration-300">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">フリータイム・面談など</h3>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-start md:items-center group">
+<div class="flex items-center md:w-32 md:justify-end md:pr-8 mb-2 md:mb-0 relative">
+<span class="absolute -left-[21px] md:static md:hidden w-4 h-4 bg-primary rounded-full border-4 border-white dark:border-gray-800"></span>
+<span class="hidden md:block absolute right-0 top-1/2 -mt-1 -mr-[19px] w-4 h-4 bg-primary rounded-full border-4 border-paper-light dark:border-gray-800"></span>
+<span class="font-bold text-primary text-lg">16:30</span>
+</div>
+<div class="pl-8 md:pl-0 flex-1">
+<div class="bg-white dark:bg-paper-dark p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-0 relative">
+<h3 class="font-bold text-lg text-gray-800 dark:text-white text-center">閉所</h3>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 text-center">
+<p class="text-primary font-bold mb-2">
+<span class="material-icons-round align-middle">restaurant</span>
+                    月１回、19時までの夕方開所日があります
+                 </p>
+<p class="text-sm text-gray-600 dark:text-gray-400">お楽しみディナーはデザート付き500円</p>
+</div>
+</div>
+</section>
+<section class="py-20 bg-white dark:bg-background-dark relative overflow-hidden" id="voice">
+<div class="absolute right-0 top-0 w-64 h-64 bg-secondary/10 rounded-bl-full pointer-events-none"></div>
+<div class="absolute left-0 bottom-0 w-32 h-32 bg-primary/10 rounded-tr-full pointer-events-none"></div>
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+<div class="text-center mb-16">
+<h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-4">ご利用者様の声</h2>
+<div class="w-24 h-1 bg-primary mx-auto rounded-full"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="bg-paper-light dark:bg-paper-dark p-8 rounded-2xl relative flex flex-col md:flex-row gap-6 items-center md:items-start transition hover:shadow-lg border border-transparent hover:border-primary/20">
+<div class="flex-shrink-0">
+<div class="w-20 h-20 rounded-full bg-primary/20 overflow-hidden border-2 border-white dark:border-gray-600 shadow-md">
+<img alt="K-sama" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-2dfZKfNeI2SnXi6_vLqAW9XKVCZinIXbVsDgM43FmiQuOoq9D3Ip31nFfVK5pFoP6UCcVRX92HPmryTIH9wchpc-Aaj1pdYW0kUn3Dfda8QcmRXROOAIMkahv5WBsoCCHpOMkYXnJqL7fSMvQG-3AWBgFlk85lBmNZoB-FtgSuaMeOmkYwZqEjbiNZouW7rA7zMdG82hDKZKcUquALVq1u2fbr5L6k4GAedSvx6kWNtbcse_EdsXlxx65WKY8Fc0Y3CCQSpHeN0"/>
+</div>
+</div>
+<div class="flex-1 text-center md:text-left">
+<p class="text-gray-700 dark:text-gray-300 italic mb-4 leading-relaxed">
+                            「普段の忙しい仕事から離れて、リラックスして時間を楽しめます。最初の頃は少し緊張したけど、今はすっかり自分の居場所です。」
+                        </p>
+<p class="font-bold text-primary text-right">— K様</p>
+</div>
+</div>
+<div class="bg-paper-light dark:bg-paper-dark p-8 rounded-2xl relative flex flex-col md:flex-row gap-6 items-center md:items-start transition hover:shadow-lg border border-transparent hover:border-primary/20">
+<div class="flex-shrink-0">
+<div class="w-20 h-20 rounded-full bg-secondary/20 overflow-hidden border-2 border-white dark:border-gray-600 shadow-md">
+<img alt="S-sama" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvV6MdfywrGQE68AAzKgF4qv1ATyguJ6VDefc-AdSw4QD_7ZbXpvasdLSDR0e6GCOm6Qr7zCvwOykpN8XHXAUqeK-Kucts14rF1xUhZVA7VhC0Q3OGTF92-Djn8zfwNKb3Z0uNMSxhknrhS0KdP2ZN6LaSEONtBQvl94mxtwUr5eFnhHLzF_f77mo3gcsiguZZVU2MELK9QGZ6EOR_nfGKkUFMrXH7kTiIdLa5MNpk6rCDXRug9Gb5wlWGD8680nsjsrC8YI7yi5A"/>
+</div>
+</div>
+<div class="flex-1 text-center md:text-left">
+<p class="text-gray-700 dark:text-gray-300 italic mb-4 leading-relaxed">
+                            「ワーサポは安らぎの場であり、憩いの場です。みんな心の病気を持つ仲間だから、安心して馴染めるし、ここに来ると明日を乗り越える力をもらえます。」
+                        </p>
+<p class="font-bold text-primary text-right">— S様</p>
+</div>
+</div>
+</div>
+<div class="mt-16 bg-white dark:bg-gray-800 p-8 rounded-2xl border-2 border-primary/20 max-w-lg mx-auto text-center relative">
+<div class="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-primary"></div>
+<div class="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-primary"></div>
+<div class="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-primary"></div>
+<div class="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-primary"></div>
+<h3 class="font-bold text-lg mb-4 text-gray-800 dark:text-white">ランチやプログラムの様子はこちらから</h3>
+<div class="flex justify-center items-center gap-4">
+<div class="bg-gray-200 dark:bg-gray-600 w-32 h-32 rounded-lg flex items-center justify-center">
+<span class="material-icons-round text-5xl text-gray-400">qr_code_2</span>
+</div>
+<div class="text-left">
+<p class="text-sm font-bold flex items-center gap-1 mb-2">
+<span class="material-icons-round text-pink-500">camera_alt</span> Instagram
+                         </p>
+<p class="text-xs text-gray-500 dark:text-gray-400">@WORKING_SUPPORT_SHINJO</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-paper-light dark:bg-gray-900" id="access">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+<div>
+<h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+<span class="material-icons-round text-primary">check_circle</span>
+                        ご利用いただくには
+                    </h2>
+<div class="bg-white dark:bg-paper-dark p-6 rounded-2xl shadow-sm mb-8">
+<p class="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                            当センターは、就労支援や障害福祉サービスなどの支援機関を通してお手続きいただくと、よりスムーズにご利用いただけます。<br/>
+                            こうした支援機関とまだつながっていない方も、まずはお気軽にお電話でご相談ください。<br/>
+                            見学も随時受け付けております。
+                        </p>
+<div class="bg-primary/10 rounded-lg p-4 mt-4">
+<h3 class="font-bold text-gray-800 dark:text-white mb-2">利用条件</h3>
+<ul class="list-disc list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
+<li>川崎市にお住まいの方</li>
+<li>精神科または心療内科に定期的に通院している方</li>
+<li>企業や就労継続支援A型事業所等に所属している方</li>
+</ul>
+</div>
+</div>
+<div class="text-center md:text-left">
+<p class="text-sm text-gray-500 mb-2">お電話でのお問い合わせ</p>
+<a class="text-3xl font-bold text-primary hover:text-opacity-80 transition" href="tel:044-863-7730">044-863-7730</a>
+</div>
+</div>
+<div>
+<h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+<span class="material-icons-round text-primary">place</span>
+                        アクセス
+                    </h2>
+<div class="bg-white dark:bg-paper-dark p-2 rounded-2xl shadow-sm mb-6 h-80 overflow-hidden relative">
+<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center rounded-xl overflow-hidden relative">
+<div class="absolute inset-0 opacity-50 bg-cover bg-center grayscale">
+<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex flex-col items-center justify-center text-gray-400">
+<span class="material-icons-round text-5xl mb-2">map</span>
+<span>Map Area</span>
+</div>
+</div>
+<div class="relative z-10 flex flex-col items-center animate-bounce">
+<span class="material-icons-round text-red-500 text-5xl drop-shadow-lg">location_on</span>
+<span class="bg-white text-gray-800 text-xs font-bold px-2 py-1 rounded shadow-md mt-1">ワーキングサポート新城</span>
+</div>
+</div>
+</div>
+<div class="space-y-4 text-gray-700 dark:text-gray-300">
+<div class="flex items-start gap-3">
+<span class="material-icons-round text-primary mt-1">train</span>
+<div>
+<p class="font-bold">南武線 武蔵新城駅 徒歩5分</p>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-icons-round text-primary mt-1">home</span>
+<div>
+<p>〒213-0014 川崎市高津区新作6丁目9-7<br/>バロン・キャッスル101</p>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-icons-round text-primary mt-1">email</span>
+<div>
+<a class="hover:text-primary transition" href="mailto:wa.sapo.sinjo@gmail.com">wa.sapo.sinjo@gmail.com</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<footer class="bg-secondary/20 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 pt-16 pb-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+<div class="lg:col-span-2">
+<h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4">公益財団法人 神奈川県社会復帰援護会</h3>
+<div class="space-y-4 text-sm text-gray-600 dark:text-gray-400">
+<div>
+<p class="font-bold text-gray-800 dark:text-gray-200 mb-1">本部事務所</p>
+<p>〒211-0034 川崎市中原区井田中ノ町41-7</p>
+<p>TEL (044)751-2756 / FAX (044)400-4148</p>
+</div>
+</div>
+</div>
+<div class="lg:col-span-2">
+<h4 class="font-bold text-gray-800 dark:text-gray-200 mb-4 border-b border-gray-300 dark:border-gray-700 pb-2">関連事業所</h4>
+<ul class="space-y-4 text-sm text-gray-600 dark:text-gray-400">
+<li>
+<p class="font-bold text-gray-700 dark:text-gray-300">相談支援事業所つむぎ</p>
+<p>〒2110034 川崎市中原区井田中ノ町41-7</p>
+</li>
+<li>
+<p class="font-bold text-gray-700 dark:text-gray-300">地域活動支援センター オアシス</p>
+<p>〒211-0034 川崎市中原区井田中ノ町41-7</p>
+</li>
+<li>
+<p class="font-bold text-gray-700 dark:text-gray-300">地域活動支援センター バンブーハウス</p>
+<p>〒213-0014 川崎市高津区新作6丁目16-23</p>
+</li>
+<li>
+<p class="font-bold text-gray-700 dark:text-gray-300">就労継続支援B型 Be Next もとすみ</p>
+<p>〒211-0034 川崎市中原区井田中ノ町21-9</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="border-t border-gray-300 dark:border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="material-icons-round text-primary">local_florist</span>
+<span class="text-sm font-medium text-gray-600 dark:text-gray-400">ワーキングサポート新城</span>
+</div>
+<p class="text-xs text-gray-500 dark:text-gray-500">
+                    &copy; Working Support Shinjo. All rights reserved.
+                </p>
+</div>
+</div>
+</footer>
+
+</body></html>
