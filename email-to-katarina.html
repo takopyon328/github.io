@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Draft - To Katarina</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 700px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .email-header {
+            background: rgb(93, 43, 129);
+            color: #fff;
+            padding: 20px 25px;
+            border-radius: 8px 8px 0 0;
+        }
+        .email-header h1 {
+            margin: 0 0 10px 0;
+            font-size: 1.4em;
+        }
+        .email-header .field {
+            margin: 5px 0;
+            font-size: 0.95em;
+        }
+        .email-header .field span {
+            font-weight: bold;
+            display: inline-block;
+            width: 70px;
+        }
+        .email-body {
+            border: 1px solid #ddd;
+            border-top: none;
+            padding: 30px 25px;
+            border-radius: 0 0 8px 8px;
+            background: #fff;
+        }
+        .email-body p {
+            margin-bottom: 1em;
+        }
+        .signature {
+            margin-top: 2em;
+            padding-top: 1em;
+            border-top: 1px solid #eee;
+            font-size: 0.95em;
+            color: #555;
+        }
+        .copy-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: rgb(0, 115, 187);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background: rgb(0, 95, 160);
+        }
+        .note {
+            margin-top: 15px;
+            font-size: 0.85em;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="email-header">
+        <h1>Email Draft</h1>
+        <div class="field"><span>To:</span> Katarina</div>
+        <div class="field"><span>Subject:</span> Thank You for the Study Abroad Opportunity for Our Students</div>
+    </div>
+
+    <div class="email-body" id="emailContent">
+        <p>Dear Katarina,</p>
+
+        <p>I hope this email finds you well.</p>
+
+        <p>I am writing to express our sincere gratitude for providing study abroad opportunities to the students of our university. Your generous support and coordination have been invaluable in helping our students broaden their academic horizons and gain international experience.</p>
+
+        <p>I would like to inform you that one of our students, <strong>Mr. Riki Sugimoto</strong>, is currently planning to participate in the study abroad program. Should you need to contact him directly, please feel free to reach him at the following email address:</p>
+
+        <p style="margin-left: 20px;">
+            <strong>Riki Sugimoto</strong><br>
+            Email: <a href="mailto:l24sst07@yamanashi.ac.jp">l24sst07@yamanashi.ac.jp</a>
+        </p>
+
+        <p>We truly appreciate your continued partnership and look forward to further collaboration.</p>
+
+        <p>Thank you very much for your kind support.</p>
+
+        <div class="signature">
+            <p>
+                Best regards,<br>
+                [Your Name]<br>
+                [Your Title]<br>
+                University of Yamanashi<br>
+                [Your Email Address]
+            </p>
+        </div>
+    </div>
+
+    <button class="copy-btn" onclick="copyEmail()">Copy Email Text</button>
+    <p class="note">* Please replace the [bracketed] fields in the signature with your information before sending.</p>
+
+    <script>
+        function copyEmail() {
+            const content = document.getElementById('emailContent').innerText;
+            navigator.clipboard.writeText(content).then(function() {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(function() {
+                    btn.textContent = 'Copy Email Text';
+                }, 2000);
+            });
+        }
+    </script>
+
+</body>
+</html>
