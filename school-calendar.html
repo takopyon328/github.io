@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>江原小学校 1年生カレンダー 令和8年度</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+const { useState } = React;
+const h = React.createElement;
+
+const MONTHS = [
+  { year: 2026, month: 4, label: "4月" },
+  { year: 2026, month: 5, label: "5月" },
+  { year: 2026, month: 6, label: "6月" },
+  { year: 2026, month: 7, label: "7月" },
+  { year: 2026, month: 8, label: "8月" },
+  { year: 2026, month: 9, label: "9月" },
+  { year: 2026, month: 10, label: "10月" },
+  { year: 2026, month: 11, label: "11月" },
+  { year: 2026, month: 12, label: "12月" },
+  { year: 2027, month: 1, label: "1月" },
+  { year: 2027, month: 2, label: "2月" },
+  { year: 2027, month: 3, label: "3月" },
+];
+
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+const CAT = {
+  ceremony: { bg: "#fde8e8", border: "#e53e3e", dot: "#e53e3e", label: "式典・節目" },
+  health: { bg: "#ebf8ff", border: "#3182ce", dot: "#3182ce", label: "健康・測定" },
+  safety: { bg: "#fefcbf", border: "#d69e2e", dot: "#d69e2e", label: "安全・訓練" },
+  parents: { bg: "#f0fff4", border: "#38a169", dot: "#38a169", label: "保護者関連" },
+  study: { bg: "#faf5ff", border: "#805ad5", dot: "#805ad5", label: "学習・行事" },
+  holiday: { bg: "#fff5f5", border: "#fc8181", dot: "#fc8181", label: "休日・休業" },
+  life: { bg: "#fffaf0", border: "#dd6b20", dot: "#dd6b20", label: "生活・その他" },
+};
+
+const events = {
+  "2026-4": {
+    8: [{ t: "入学式", c: "ceremony" }, { t: "心臓検診(1)", c: "health" }],
+    10: [{ t: "発育測定(1・2・3・わ)", c: "health" }],
+    11: [{ t: "避難訓練", c: "safety" }],
+    15: [{ t: "避難訓練", c: "safety" }],
+    16: [{ t: "聴力検査(1・2・3・5)", c: "health" }],
+    21: [{ t: "交通安全教室(1)", c: "safety" }],
+    22: [{ t: "内科健診(1・わ)", c: "health" }],
+    25: [{ t: "学校公開日①", c: "parents" }, { t: "合同引き渡し訓練", c: "safety" }],
+    27: [{ t: "振替休業日", c: "holiday" }],
+    28: [{ t: "運動会特別時間割開始", c: "study" }],
+    29: [{ t: "昭和の日", c: "holiday" }],
+  },
+  "2026-5": {
+    1: [{ t: "安全指導", c: "safety" }],
+    3: [{ t: "憲法記念日", c: "holiday" }],
+    4: [{ t: "みどりの日", c: "holiday" }],
+    5: [{ t: "こどもの日", c: "holiday" }],
+    6: [{ t: "振替休日", c: "holiday" }],
+    8: [{ t: "耳鼻科健診(1・3)", c: "health" }],
+    11: [{ t: "避難訓練", c: "safety" }],
+    12: [{ t: "体力テスト終", c: "health" }],
+    16: [{ t: "ふれあい班③", c: "study" }],
+    19: [{ t: "開校記念日", c: "ceremony" }],
+    20: [{ t: "運動会全体練習", c: "study" }],
+    23: [{ t: "学校公開日②", c: "parents" }, { t: "運動会", c: "study" }],
+    24: [{ t: "運動会予備日①", c: "study" }],
+    25: [{ t: "振替休業日", c: "holiday" }],
+    26: [{ t: "運動会予備日②", c: "study" }],
+    28: [{ t: "体力テスト始", c: "health" }],
+  },
+  "2026-6": {
+    1: [{ t: "安全指導日", c: "safety" }],
+    4: [{ t: "ふれあい班", c: "study" }],
+    8: [{ t: "読書旬間開始", c: "study" }],
+    9: [{ t: "避難訓練", c: "safety" }],
+    11: [{ t: "教育活動休止日", c: "holiday" }],
+    12: [{ t: "教育活動休止日", c: "holiday" }],
+    15: [{ t: "水泳指導開始", c: "study" }],
+    16: [{ t: "避難訓練", c: "safety" }],
+    17: [{ t: "歯科検診(全)", c: "health" }],
+  },
+  "2026-7": {
+    1: [{ t: "安全指導日", c: "safety" }],
+    3: [{ t: "保護者面談開始", c: "parents" }],
+    8: [{ t: "避難訓練", c: "safety" }],
+    11: [{ t: "山の日", c: "holiday" }],
+    17: [{ t: "ふれあい班", c: "study" }],
+    20: [{ t: "海の日", c: "holiday" }],
+    21: [{ t: "夏季休業日始", c: "holiday" }],
+  },
+  "2026-8": {
+    31: [{ t: "夏季休業日終", c: "holiday" }],
+  },
+  "2026-9": {
+    1: [{ t: "始業式", c: "ceremony" }, { t: "安全指導", c: "safety" }, { t: "給食始", c: "life" }],
+    8: [{ t: "発育測定(1)", c: "health" }],
+    11: [{ t: "避難訓練", c: "safety" }],
+    21: [{ t: "敬老の日", c: "holiday" }],
+    22: [{ t: "秋分の日", c: "holiday" }],
+    23: [{ t: "生活科見学(1・2)", c: "study" }],
+  },
+  "2026-10": {
+    1: [{ t: "都民の日", c: "holiday" }],
+    2: [{ t: "安全指導日", c: "safety" }],
+    5: [{ t: "保護者会(1・2・3・4)", c: "parents" }],
+    7: [{ t: "体力向上プログラム", c: "study" }],
+    8: [{ t: "ふれあい班⑤", c: "study" }],
+    9: [{ t: "前期終集式・給食終", c: "ceremony" }],
+    10: [{ t: "秋季休業日", c: "holiday" }],
+    13: [{ t: "後期始業式", c: "ceremony" }, { t: "給食始", c: "life" }],
+    14: [{ t: "避難訓練", c: "safety" }],
+    22: [{ t: "ふれあい班⑥", c: "study" }],
+    23: [{ t: "生活科見学(1)", c: "study" }],
+    27: [{ t: "演劇鑑賞教室", c: "study" }],
+  },
+  "2026-11": {
+    2: [{ t: "安全指導日", c: "safety" }],
+    3: [{ t: "文化の日", c: "holiday" }],
+    4: [{ t: "江原こどもランド", c: "study" }],
+    12: [{ t: "ふれあい班⑦", c: "study" }],
+    13: [{ t: "歯科健診(1・2・3・わ)", c: "health" }],
+    23: [{ t: "勤労感謝の日", c: "holiday" }],
+  },
+  "2026-12": {
+    1: [{ t: "安全指導日", c: "safety" }],
+    5: [{ t: "避難訓練", c: "safety" }],
+    15: [{ t: "ふれあい班⑧", c: "study" }],
+    22: [{ t: "大掃除", c: "life" }],
+    25: [{ t: "終業式", c: "ceremony" }],
+  },
+  "2027-1": {
+    1: [{ t: "元日", c: "holiday" }],
+    8: [{ t: "始業式", c: "ceremony" }],
+    9: [{ t: "安全指導日", c: "safety" }, { t: "給食始", c: "life" }],
+    10: [{ t: "避難訓練", c: "safety" }],
+    13: [{ t: "発育測定(1・2・3・わ)", c: "health" }],
+    15: [{ t: "ふれあい班⑨", c: "study" }],
+    18: [{ t: "体力向上プログラム", c: "study" }],
+    19: [{ t: "避難訓練", c: "safety" }],
+  },
+  "2027-2": {
+    1: [{ t: "安全指導日", c: "safety" }, { t: "保護者会(1・2)", c: "parents" }],
+    10: [{ t: "避難訓練", c: "safety" }],
+    11: [{ t: "建国記念の日", c: "holiday" }],
+    13: [{ t: "発育測定", c: "health" }],
+    19: [{ t: "避難訓練", c: "safety" }],
+    23: [{ t: "天皇誕生日", c: "holiday" }],
+  },
+  "2027-3": {
+    1: [{ t: "安全指導日", c: "safety" }],
+    2: [{ t: "保護者会(1・2)", c: "parents" }],
+    8: [{ t: "避難訓練", c: "safety" }],
+    19: [{ t: "避難訓練", c: "safety" }],
+    20: [{ t: "春分の日", c: "holiday" }],
+    25: [{ t: "修了式", c: "ceremony" }],
+    26: [{ t: "春季休業日始", c: "holiday" }],
+  },
+};
+
+function getEventsForDay(year, month, day) {
+  return (events[year + "-" + month] || {})[day] || [];
+}
+function getDaysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+function getFirstDayOfWeek(year, month) {
+  return new Date(year, month - 1, 1).getDay();
+}
+
+function MonthCalendar(props) {
+  var year = props.year, month = props.month, label = props.label,
+      selectedDay = props.selectedDay, onSelectDay = props.onSelectDay;
+  var days = getDaysInMonth(year, month);
+  var firstDay = getFirstDayOfWeek(year, month);
+  var cells = [];
+
+  for (var i = 0; i < firstDay; i++) {
+    cells.push(h("td", { key: "e-" + i, style: { padding: "2px" } }));
+  }
+
+  for (var d = 1; d <= days; d++) {
+    (function(d) {
+      var dayEvents = getEventsForDay(year, month, d);
+      var dow = (firstDay + d - 1) % 7;
+      var isSun = dow === 0;
+      var isSat = dow === 6;
+      var isSelected = selectedDay && selectedDay.year === year && selectedDay.month === month && selectedDay.day === d;
+      var hasEvents = dayEvents.length > 0;
+
+      var dots = hasEvents ? h("div", {
+        style: { display: "flex", gap: "2px", justifyContent: "center", marginTop: "-2px", marginBottom: "1px" }
+      }, dayEvents.slice(0, 3).map(function(e, i) {
+        return h("div", {
+          key: i,
+          style: {
+            width: "5px", height: "5px", borderRadius: "50%",
+            background: isSelected ? "#fff" : (CAT[e.c] ? CAT[e.c].dot : "#a0aec0")
+          }
+        });
+      })) : null;
+
+      cells.push(h("td", {
+        key: d,
+        onClick: function() { if (hasEvents) onSelectDay({ year: year, month: month, day: d }); },
+        style: {
+          padding: "2px", textAlign: "center",
+          cursor: hasEvents ? "pointer" : "default",
+          borderRadius: "6px",
+          background: isSelected ? "#1a202c" : hasEvents ? "#f7f7f5" : "transparent",
+          transition: "background 0.15s"
+        }
+      },
+        h("div", {
+          style: {
+            fontSize: "13px", fontWeight: hasEvents ? 700 : 400,
+            color: isSelected ? "#fff" : isSun ? "#c53030" : isSat ? "#2b6cb0" : hasEvents ? "#1a202c" : "#a0aec0",
+            lineHeight: "24px"
+          }
+        }, d),
+        dots
+      ));
+    })(d);
+  }
+
+  var rows = [];
+  var row = [];
+  cells.forEach(function(cell, i) {
+    row.push(cell);
+    if ((i + 1) % 7 === 0) {
+      rows.push(h("tr", { key: "r-" + rows.length }, row));
+      row = [];
+    }
+  });
+  if (row.length > 0) {
+    while (row.length < 7) row.push(h("td", { key: "pad-" + row.length }));
+    rows.push(h("tr", { key: "r-" + rows.length }, row));
+  }
+
+  return h("div", { style: { minWidth: "240px", flex: "1 1 280px" } },
+    h("div", { style: { fontWeight: 800, fontSize: "15px", marginBottom: "6px", color: "#1a202c", letterSpacing: "0.5px" } },
+      label, " ",
+      h("span", { style: { fontWeight: 400, fontSize: "12px", color: "#718096" } }, year)
+    ),
+    h("table", { style: { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" } },
+      h("thead", null,
+        h("tr", null, WEEKDAYS.map(function(w, i) {
+          return h("th", {
+            key: w,
+            style: {
+              fontSize: "11px", fontWeight: 600,
+              color: i === 0 ? "#c53030" : i === 6 ? "#2b6cb0" : "#a0aec0",
+              paddingBottom: "4px", textAlign: "center"
+            }
+          }, w);
+        }))
+      ),
+      h("tbody", null, rows)
+    )
+  );
+}
+
+function EventDetail(props) {
+  var selectedDay = props.selectedDay;
+  if (!selectedDay) {
+    return h("div", {
+      style: { color: "#a0aec0", fontSize: "14px", padding: "20px", textAlign: "center", fontStyle: "italic" }
+    }, "日付をクリックすると予定が表示されます");
+  }
+  var dayEvents = getEventsForDay(selectedDay.year, selectedDay.month, selectedDay.day);
+  if (dayEvents.length === 0) return null;
+  var dow = new Date(selectedDay.year, selectedDay.month - 1, selectedDay.day).getDay();
+
+  return h("div", { style: { padding: "0 4px" } },
+    h("div", { style: { fontWeight: 800, fontSize: "16px", color: "#1a202c", marginBottom: "10px" } },
+      selectedDay.month + "月" + selectedDay.day + "日（" + WEEKDAYS[dow] + "）"
+    ),
+    h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
+      dayEvents.map(function(e, i) {
+        var cat = CAT[e.c];
+        return h("div", {
+          key: i,
+          style: {
+            display: "flex", alignItems: "center", gap: "10px",
+            padding: "10px 14px", borderRadius: "10px",
+            background: cat ? cat.bg : "#f7fafc",
+            borderLeft: "4px solid " + (cat ? cat.border : "#cbd5e0")
+          }
+        },
+          h("div", { style: { fontSize: "14px", fontWeight: 600, color: "#1a202c" } }, e.t),
+          h("div", { style: { fontSize: "11px", color: cat ? cat.border : "#a0aec0", marginLeft: "auto", whiteSpace: "nowrap" } }, cat ? cat.label : "")
+        );
+      })
+    )
+  );
+}
+
+function EharaCalendar() {
+  var state1 = useState(null);
+  var selectedDay = state1[0], setSelectedDay = state1[1];
+  var state2 = useState("grid");
+  var viewMode = state2[0], setViewMode = state2[1];
+
+  var allEvents = [];
+  MONTHS.forEach(function(m) {
+    var key = m.year + "-" + m.month;
+    var monthEvents = events[key];
+    if (!monthEvents) return;
+    Object.keys(monthEvents).forEach(function(day) {
+      monthEvents[day].forEach(function(e) {
+        allEvents.push({ year: m.year, month: m.month, day: parseInt(day), label: m.label, t: e.t, c: e.c });
+      });
+    });
+  });
+
+  var legend = Object.keys(CAT).map(function(k) {
+    var cat = CAT[k];
+    return h("div", { key: cat.label, style: { display: "flex", alignItems: "center", gap: "5px" } },
+      h("div", { style: { width: "10px", height: "10px", borderRadius: "50%", background: cat.dot } }),
+      h("span", { style: { fontSize: "11px", color: "#4a5568" } }, cat.label)
+    );
+  });
+
+  var viewButtons = [{ key: "grid", label: "カレンダー" }, { key: "list", label: "一覧" }].map(function(m) {
+    return h("button", {
+      key: m.key,
+      onClick: function() { setViewMode(m.key); },
+      style: {
+        padding: "6px 16px", borderRadius: "8px", border: "none",
+        fontSize: "13px", fontWeight: 600, cursor: "pointer",
+        background: viewMode === m.key ? "#1a202c" : "#edf2f7",
+        color: viewMode === m.key ? "#fff" : "#4a5568",
+        transition: "all 0.15s"
+      }
+    }, m.label);
+  });
+
+  var content;
+  if (viewMode === "grid") {
+    content = [
+      h("div", {
+        key: "grid",
+        style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "24px", marginBottom: "24px" }
+      }, MONTHS.map(function(m) {
+        return h(MonthCalendar, {
+          key: m.year + "-" + m.month, year: m.year, month: m.month, label: m.label,
+          selectedDay: selectedDay, onSelectDay: setSelectedDay
+        });
+      })),
+      h("div", {
+        key: "detail",
+        style: { position: "sticky", bottom: 0, background: "#fff", borderTop: "1px solid #e2e8f0", padding: "16px 0", minHeight: "60px" }
+      }, h(EventDetail, { selectedDay: selectedDay }))
+    ];
+  } else {
+    var currentMonth = "";
+    content = h("div", { style: { display: "flex", flexDirection: "column", gap: "4px" } },
+      allEvents.map(function(e, i) {
+        var monthHeader = e.month + "月";
+        var showHeader = monthHeader !== currentMonth;
+        currentMonth = monthHeader;
+        var dow = new Date(e.year, e.month - 1, e.day).getDay();
+        var cat = CAT[e.c];
+        return h("div", { key: i },
+          showHeader ? h("div", {
+            style: {
+              fontWeight: 800, fontSize: "15px", color: "#1a202c",
+              padding: "16px 0 6px 0", borderBottom: "2px solid #1a202c",
+              marginBottom: "8px", marginTop: i > 0 ? "12px" : 0
+            }
+          }, e.label, " ", h("span", { style: { fontWeight: 400, fontSize: "12px", color: "#718096" } }, e.year)) : null,
+          h("div", {
+            style: {
+              display: "flex", alignItems: "center", gap: "12px",
+              padding: "8px 12px", borderRadius: "8px",
+              background: cat ? cat.bg : "#f7fafc",
+              borderLeft: "3px solid " + (cat ? cat.border : "#cbd5e0")
+            }
+          },
+            h("div", {
+              style: {
+                fontSize: "13px", fontWeight: 700,
+                color: dow === 0 ? "#c53030" : dow === 6 ? "#2b6cb0" : "#4a5568",
+                minWidth: "60px"
+              }
+            }, e.day + "日（" + WEEKDAYS[dow] + "）"),
+            h("div", { style: { fontSize: "13px", fontWeight: 600, color: "#1a202c" } }, e.t),
+            h("div", { style: { fontSize: "11px", color: cat ? cat.border : "", marginLeft: "auto", whiteSpace: "nowrap" } }, cat ? cat.label : "")
+          )
+        );
+      })
+    );
+  }
+
+  return h("div", {
+    style: {
+      fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif",
+      maxWidth: "960px", margin: "0 auto", padding: "24px 16px", background: "#fff", minHeight: "100vh"
+    }
+  },
+    h("div", { style: { marginBottom: "24px" } },
+      h("div", { style: { display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" } },
+        h("h1", { style: { fontSize: "22px", fontWeight: 900, color: "#1a202c", margin: 0, letterSpacing: "-0.5px" } }, "江原小学校 1年生カレンダー"),
+        h("span", { style: { fontSize: "13px", color: "#718096", fontWeight: 500 } }, "令和8年度（2026–2027）")
+      ),
+      h("p", { style: { fontSize: "12px", color: "#a0aec0", margin: "6px 0 0 0" } },
+        "※ 全校行事 + 1年生対象の行事を抽出（月別再確認済み）。画像の判読限界により一部未掲載の可能性あり。"
+      )
+    ),
+    h("div", { style: { display: "flex", gap: "4px", marginBottom: "20px" } }, viewButtons),
+    h("div", { style: { display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "20px" } }, legend),
+    content
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h(EharaCalendar));
+</script>
+</body>
+</html>
