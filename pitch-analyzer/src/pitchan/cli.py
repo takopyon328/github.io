@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import align, f0 as f0mod, normalize, outputs, segment, textproc
+from . import align, f0 as f0mod, normalize, outputs, segment, textproc, tobi
 
 logger = logging.getLogger("pitchan")
 
@@ -80,6 +80,8 @@ def _build_parser() -> argparse.ArgumentParser:
         p.add_argument("--plot", action="store_true", help="PNG 可視化を出力する")
         p.add_argument("--plot-ap", action="store_true",
                        help="アクセント句ごとの PNG を <name>_ap_plots/ に出力する")
+        p.add_argument("--xjtobi", action="store_true",
+                       help="簡易版 X-JToBI 準拠の TextGrid(下書き)を出力する")
         p.add_argument("--bom", action="store_true",
                        help="CSV を BOM 付き UTF-8 で出力する(Excel 用)")
         p.add_argument("--jobs", type=int, default=4,
@@ -193,6 +195,8 @@ def run_pipeline(pairs: list[Pair], args) -> None:
 
         frames = outputs.build_frames_df(pr.name, times, f0_hz, f0_st, f0_z, aps)
         summary = outputs.build_ap_summary_df(pr.name, times, f0_st, aps)
+        bpm = tobi.classify_bpm_all(times, f0_st, all_phones[pr.name], aps)
+        summary["bpm_auto"] = summary["ap_index"].map(bpm)
         contours = outputs.build_contours_df(
             pr.name, times, f0_st, aps, args.norm_points
         )
@@ -210,6 +214,11 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         outputs.write_textgrid(
             out_dir / f"{pr.name}.TextGrid", aps, all_phones[pr.name], dur
         )
+        if args.xjtobi:
+            tobi.write_xjtobi_textgrid(
+                out_dir / f"{pr.name}_xjtobi.TextGrid",
+                aps, all_phones[pr.name], dur, times, f0_st,
+            )
         if args.plot:
             outputs.plot_f0(out_dir / f"{pr.name}_f0.png", times, f0_st, aps)
         if args.plot_ap:

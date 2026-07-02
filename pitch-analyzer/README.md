@@ -63,6 +63,7 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 | `--median-filter` | off | F0 の 5 点メディアンフィルタ(倍/半ピッチ誤り緩和) |
 | `--plot` | off | ファイル全体の F0 曲線+句境界の PNG を出力 |
 | `--plot-ap` | off | アクセント句ごとの PNG を `<name>_ap_plots/` に出力(表記・読み・アクセント型・単語境界つき。縦軸はファイル内共通) |
+| `--xjtobi` | off | 簡易版 X-JToBI(五十嵐 2015)準拠の TextGrid 下書きを `<name>_xjtobi.TextGrid` に出力 |
 | `--bom` | off | CSV を BOM 付き UTF-8 で出力(Excel で開く場合) |
 | `--jobs` | 4 | 並列数(F0 抽出と MFA に適用) |
 
@@ -81,6 +82,22 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 
 `results/work/` に MFA の中間ファイル(コーパス・生成辞書・アラインメント結果)が
 残るので、アラインメントの検証に使えます。
+
+## 簡易版 X-JToBI 出力(`--xjtobi`)
+
+簡易版 X-JToBI(五十嵐 2015)準拠の 4 層 TextGrid を**下書き**として出力します:
+
+| 層 | 内容 | 由来 |
+|----|------|------|
+| `segments` | 音素区間 | MFA アラインメント |
+| `tones` | BPM(句末境界音調)の自動判定: H% / LH% / HL%(ポイント層) | F0 形状の規則判定(ドラフト) |
+| `words` | カナ単語+アクセント核記号 `'`(例: ヤマナシダ'イガク) | テキスト予測(東京方言の規範) |
+| `BI` | 1=語境界 / 2=アクセント句境界 / 3=イントネーション句境界(ポイント層) | 1・2 はテキスト予測、3 は実ポーズ(0.2 秒以上)で検出 |
+
+- 核記号と BI=2 は**規範(予測)**です。実際の発話の記述としては Praat 上で手修正してください。
+  修正前(規範)と修正後(実現)の差分が、話者の韻律的逸脱のデータになります。
+- BPM の自動判定はドラフト品質です。`ap_summary.csv` の `bpm_auto` 列にも同じ判定が
+  入るので、まず数ファイルで聴覚判断との一致を確認してから利用してください。
 
 ## 正規化の定義
 

@@ -50,12 +50,15 @@ def test_e2e_batch(tmp_path, fake_mfa_on_path):
 
     out_dir = tmp_path / "out"
     rc = main(
-        ["batch", "--dir", str(data_dir), "--out", str(out_dir), "--jobs", "1"]
+        ["batch", "--dir", str(data_dir), "--out", str(out_dir),
+         "--jobs", "1", "--xjtobi"]
     )
     assert rc == 0
 
     summary = pd.read_csv(out_dir / "sample_ap_summary.csv")
     assert len(summary) == len(aps)
+    assert "bpm_auto" in summary.columns
+    assert (out_dir / "sample_xjtobi.TextGrid").exists()
     # 全フレームが 150 Hz なので半音値はほぼ 0(基準 = 幾何平均)
     assert summary["f0_mean_st"].abs().max() < 1.0
 

@@ -146,6 +146,14 @@ pitchan analyze --wav recording.wav --from-textgrid fixed.TextGrid --out results
   メディアンフィルタ(5点)を提供。
 - 複数話者が混在する音声、歌唱、自発音声(フィラー・言い淀み多数)は対象外。
 
+## 7.5 簡易版 X-JToBI 下書き出力(追加機能)
+
+五十嵐(2015)の簡易版 X-JToBI に準拠した 4 層(segments / tones / words / BI)の
+TextGrid を自動生成する(`--xjtobi`)。核記号・BI=2 はテキスト予測(規範)、
+BI=3 は実ポーズ(≥0.2 秒)による検出、tones 層は句末最終音素区間の F0 形状に
+よる BPM 規則判定(H% / LH% / HL%、ドラフト品質)。人手修正を前提とした
+プリラベルであり、`ap_summary.csv` に `bpm_auto` 列を併記する。
+
 ## 8. 段階的実装計画
 
 1. **Phase 1**: F0 抽出+pyopenjtalk による AP 推定+MFA アラインメント+CSV/JSON 出力(コア)
