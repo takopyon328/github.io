@@ -87,6 +87,45 @@ def test_classify_bpm_flat(aps_with_times):
     assert tobi.classify_bpm(times, f0, phones, ap) == ""
 
 
+def test_tone_points(aps_with_times):
+    aps = aps_with_times
+    bpm = {ap.index: "" for ap in aps}
+    bpm[aps[-1].index] = "LH%"
+    pts = tobi.tone_points(aps, bpm)
+    labels = [p[1] for p in pts]
+    # 発話頭と実ポーズ後(AP2)に %L
+    assert labels.count("%L") == 2
+    # 有核句には H*+L(4句とも有核)
+    assert labels.count("H*+L") == 4
+    # 頭高(1型)のオンセーオには H- が付かない
+    n_hminus = labels.count("H-")
+    assert n_hminus == sum(1 for ap in aps if ap.accent_type != 1)
+    # 句末は L%、BPM 付きは連結表記
+    assert labels.count("L%") == 3
+    assert "L%LH%" in labels
+    # 時刻は単調増加
+    times_ = [p[0] for p in pts]
+    assert all(t2 > t1 for t1, t2 in zip(times_, times_[1:]))
+
+
+def test_peak_excl_bpm(aps_with_times):
+    ap = aps_with_times[-1]
+    phones = [(ap.t_start, ap.t_end - 0.15, "x"), (ap.t_end - 0.15, ap.t_end, "a")]
+    times = _times_grid(0, ap.t_end + 0.1)
+    f0 = np.zeros_like(times)
+    body = (times >= ap.t_start) & (times < ap.t_end - 0.15)
+    tail = (times >= ap.t_end - 0.15) & (times <= ap.t_end)
+    f0[body] = 2.0  # 句本体は 2 半音
+    f0[tail] = np.linspace(0, 6, tail.sum())  # BPM 区間で 6 半音まで上昇
+    # BPM ありなら末尾の上昇(6半音)を除いて 2 半音がピークになる
+    st, t = tobi.peak_excl_bpm(times, f0, phones, ap, "H%")
+    assert st == pytest.approx(2.0)
+    assert t < ap.t_end - 0.15
+    # BPM なしなら全体の最大(末尾の 6 半音)
+    st2, _ = tobi.peak_excl_bpm(times, f0, phones, ap, "")
+    assert st2 == pytest.approx(6.0, abs=0.1)
+
+
 def test_write_xjtobi_textgrid(aps_with_times, tmp_path):
     from praatio import textgrid as ptg
 
@@ -107,3 +146,7 @@ def test_write_xjtobi_textgrid(aps_with_times, tmp_path):
     bi_labels = [e.label for e in tg.getTier("BI").entries]
     assert set(bi_labels) <= {"1", "2", "3"}
     assert "3" in bi_labels
+    tone_labels = [e.label for e in tg.getTier("tones").entries]
+    assert "%L" in tone_labels
+    assert "H*+L" in tone_labels
+    assert any(lab.startswith("L%") for lab in tone_labels)

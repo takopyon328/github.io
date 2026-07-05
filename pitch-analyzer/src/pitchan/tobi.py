@@ -2,12 +2,15 @@
 
 出力する 4 層:
 - segments: 音素区間(MFA の phones をそのまま流用)
-- tones:    BPM(句末境界音調)の自動判定ラベル(H% / LH% / HL%)。ポイント層
+- tones:    トーンの下書き。イントネーション句頭の %L、句頭上昇 H-、
+            アクセント核 H*+L(いずれも予測に基づく近似位置)と、
+            句末の L%(+BPM 自動判定 H% / LH% / HL% を連結、例 "L%LH%")。ポイント層
 - words:    カナ単語+アクセント核記号(')。核位置はテキスト予測(規範)
 - BI:       1=語境界, 2=アクセント句境界, 3=イントネーション句境界。ポイント層
 
-注意: words 層の核記号と BI=2 はテキストからの予測(東京方言の規範)であり、
-実際の発話の記述は Praat 上での手修正によって行う(下書きとしての出力)。
+注意: words 層の核記号・BI=2・tones 層の %L/H-/H*+L はテキストからの予測
+(東京方言の規範)であり、位置は近似(簡易版の方針どおり F0 曲線への正確な
+同期は行わない)。実際の発話の記述は Praat 上での手修正によって行う。
 BI=3 は実ポーズの有無による近似、BPM は F0 形状の規則判定でありドラフト品質。
 """
 
@@ -131,6 +134,67 @@ def classify_bpm(
     return ""
 
 
+def _nucleus_time(ap: AccentPhrase) -> float | None:
+    """予測アクセント核(核モーラの終端)の近似時刻を返す。
+
+    核を含む単語の中で、モーラ数に比例した線形配分で近似する
+    (簡易版の方針どおり正確な同期は求めない)。
+    """
+    if not ap.accent_type or ap.t_start is None:
+        return None
+    remaining = ap.accent_type
+    for w in ap.words:
+        moras = split_moras(w.pron)
+        if remaining <= len(moras):
+            if w.t_start is None:
+                return None
+            return w.t_start + (remaining / len(moras)) * (w.t_end - w.t_start)
+        remaining -= len(moras)
+    return None
+
+
+def tone_points(
+    aps: list[AccentPhrase], bpm: dict[int, str]
+) -> list[tuple[float, str]]:
+    """tones 層のポイント列を生成する。
+
+    - %L: イントネーション句頭(発話頭・実ポーズ後)の AP 開始位置
+    - H-: 句頭上昇の目標(第 1 モーラ終端の近似位置)。頭高(1型)の句には付けない
+    - H*+L: 予測アクセント核の近似位置(有核句のみ)
+    - L%(+BPM): AP 終端。BPM 判定があれば "L%H%" のように連結
+    """
+    points: list[tuple[float, str]] = []
+    prev: AccentPhrase | None = None
+    for ap in aps:
+        if ap.t_start is None:
+            continue
+        dur = ap.t_end - ap.t_start
+        if prev is None or (ap.t_start - prev.t_end) >= MIN_PAUSE_FOR_BI3:
+            points.append((ap.t_start, "%L"))
+        if ap.accent_type != 1 and ap.mora_count >= 2:
+            points.append((ap.t_start + dur / ap.mora_count, "H-"))
+        if ap.accent_type and ap.accent_type >= 1:
+            t_nuc = _nucleus_time(ap)
+            if t_nuc is not None:
+                points.append((t_nuc, "H*+L"))
+        points.append((ap.t_end, "L%" + bpm.get(ap.index, "")))
+        prev = ap
+    return _strictly_increasing(points)
+
+
+def _strictly_increasing(
+    points: list[tuple[float, str]], min_step: float = 0.001
+) -> list[tuple[float, str]]:
+    """ポイント層の時刻を単調増加に補正する(同時刻・逆順は 1ms ずつずらす)。"""
+    points = sorted(points, key=lambda p: p[0])
+    out: list[tuple[float, str]] = []
+    for t, label in points:
+        if out and t <= out[-1][0]:
+            t = out[-1][0] + min_step
+        out.append((t, label))
+    return out
+
+
 def classify_bpm_all(
     times: np.ndarray,
     f0_st: np.ndarray,
@@ -153,12 +217,8 @@ def write_xjtobi_textgrid(
     if phones:
         tg.addTier(ptg.IntervalTier("segments", phones, 0, duration))
 
-    tone_points = []
-    for ap in aps:
-        label = classify_bpm(times, f0_st, phones, ap)
-        if label and ap.t_end is not None:
-            tone_points.append((ap.t_end, label))
-    tg.addTier(ptg.PointTier("tones", tone_points, 0, duration))
+    bpm = classify_bpm_all(times, f0_st, phones, aps)
+    tg.addTier(ptg.PointTier("tones", tone_points(aps, bpm), 0, duration))
 
     word_entries = []
     for ap in aps:
@@ -170,3 +230,46 @@ def write_xjtobi_textgrid(
 
     tg.addTier(ptg.PointTier("BI", bi_points(aps), 0, duration))
     tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)
+
+
+def peak_excl_bpm(
+    times: np.ndarray,
+    f0_st: np.ndarray,
+    phones: list[tuple[float, float, str]],
+    ap: AccentPhrase,
+    bpm_label: str,
+) -> tuple[float, float]:
+    """BPM 区間を除いた AP 内の最大 F0(半音)とその時刻を返す(五十嵐方式)。
+
+    BPM がない句では AP 全体の最大値と同じになる。計測不能なら (nan, nan)。
+    """
+    if ap.t_start is None:
+        return (float("nan"), float("nan"))
+    t_end = ap.t_end
+    if bpm_label:
+        region = _bpm_region(phones, ap)
+        if region is not None:
+            t_end = region[0]
+    idx = np.where((times >= ap.t_start) & (times <= t_end))[0]
+    if len(idx) == 0:
+        return (float("nan"), float("nan"))
+    v = f0_st[idx]
+    ok = ~np.isnan(v)
+    if not ok.any():
+        return (float("nan"), float("nan"))
+    sub = np.where(ok)[0]
+    imax = sub[int(np.argmax(v[sub]))]
+    return float(v[imax]), float(times[idx][imax])
+
+
+def peak_excl_bpm_all(
+    times: np.ndarray,
+    f0_st: np.ndarray,
+    phones: list[tuple[float, float, str]],
+    aps: list[AccentPhrase],
+    bpm: dict[int, str],
+) -> dict[int, tuple[float, float]]:
+    return {
+        ap.index: peak_excl_bpm(times, f0_st, phones, ap, bpm.get(ap.index, ""))
+        for ap in aps
+    }

@@ -197,6 +197,13 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         summary = outputs.build_ap_summary_df(pr.name, times, f0_st, aps)
         bpm = tobi.classify_bpm_all(times, f0_st, all_phones[pr.name], aps)
         summary["bpm_auto"] = summary["ap_index"].map(bpm)
+        peaks = tobi.peak_excl_bpm_all(times, f0_st, all_phones[pr.name], aps, bpm)
+        summary["peak_excl_bpm_st"] = summary["ap_index"].map(
+            lambda i: round(peaks[i][0], 3)
+        )
+        summary["peak_excl_bpm_time"] = summary["ap_index"].map(
+            lambda i: round(peaks[i][1], 4)
+        )
         contours = outputs.build_contours_df(
             pr.name, times, f0_st, aps, args.norm_points
         )
