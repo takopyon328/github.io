@@ -79,3 +79,23 @@ def test_textgrid_roundtrip(aligned_aps, tmp_path):
     tokens = [w.pron for ap in aps for w in ap.words]
     words, _ = align.read_word_intervals(tmp_path / "rt.TextGrid", tokens)
     assert [w[2] for w in words] == tokens
+
+
+def test_flag_low_confidence_f0(aligned_aps):
+    aps, total = aligned_aps
+    times = np.arange(0, total + 0.5, 0.005)
+    f0 = np.full_like(times, 120.0)
+
+    # AP0: 有声率を下げる(70% を無声化)
+    sel0 = (times >= aps[0].t_start) & (times <= aps[0].t_end)
+    idx0 = np.where(sel0)[0]
+    f0[idx0[: int(len(idx0) * 0.7)]] = 0.0
+    # AP1: オクターブ跳躍を入れる(隣接フレームで 2 倍)
+    sel1 = (times >= aps[1].t_start) & (times <= aps[1].t_end)
+    idx1 = np.where(sel1)[0]
+    f0[idx1[len(idx1) // 2]] = 240.0
+
+    segment.flag_low_confidence_f0(aps, times, f0)
+    assert aps[0].low_confidence      # 有声率
+    assert aps[1].low_confidence      # 跳躍
+    assert not aps[2].low_confidence  # 正常な句は影響なし

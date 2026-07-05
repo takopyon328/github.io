@@ -61,6 +61,7 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 | `--norm-points` | 30 | 時間正規化輪郭の点数 |
 | `--interpolate` | off | アクセント句内の無声区間を線形補間 |
 | `--median-filter` | off | F0 の 5 点メディアンフィルタ(倍/半ピッチ誤り緩和) |
+| `--adaptive-range` | off | 話者ごとに 2 パスで F0 探索範囲を自動推定(第 1 パス 60–600 Hz の有声フレーム四分位から floor=0.75×Q25 / ceil=1.5×Q75)。`--f0-floor/--f0-ceil` の手動指定より優先。実際に使われた値は各 `.json` の `f0_floor/f0_ceil` に記録 |
 | `--plot` | off | ファイル全体の F0 曲線+句境界の PNG を出力 |
 | `--plot-ap` | off | アクセント句ごとの PNG を `<name>_ap_plots/` に出力(表記・読み・アクセント型・単語境界つき。縦軸はファイル内共通) |
 | `--xjtobi` | off | 簡易版 X-JToBI(五十嵐 2015)準拠の TextGrid 下書きを `<name>_xjtobi.TextGrid` に出力 |
@@ -147,8 +148,10 @@ pitchan xjtobi-measure --wav rec.wav --textgrid rec_xjtobi_fixed.TextGrid --out 
 - **テキストと音声が一致していること**が前提です。読み飛ばし・言い直しが多いと
   アラインメントが破綻します。15 分程度の長尺でも動作しますが、不一致が多い場合は
   段落単位で音声・テキストを分割すると頑健になります。
-- 1 モーラあたりの長さが極端(30ms 未満 / 500ms 超)な句には `low_confidence=1` が
-  付きます。集計前に除外を検討してください。
+- `low_confidence=1` は次のいずれかに該当する句に付きます。集計前に除外を検討してください。
+  - 1 モーラあたりの長さが極端(30ms 未満 / 500ms 超)= アラインメントの疑い
+  - 有声率 50% 未満 / 隣接有声フレーム間の 8 半音超の跳躍(倍・半ピッチ誤りの疑い)/
+    0.4 秒超の連続無声 = F0 抽出の疑い
 
 ## 開発
 

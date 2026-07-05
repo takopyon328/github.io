@@ -30,6 +30,8 @@ def extract_f0(
         x, sr, f0_floor=f0_floor, f0_ceil=f0_ceil, frame_period=frame_shift_ms
     )
     f0 = pyworld.stonemask(x, f0, t, sr)
+    # harvest は探索上下限の外側の値も返すことがあるため、範囲外を無声(0)にする
+    f0[(f0 > 0) & ((f0 < f0_floor) | (f0 > f0_ceil))] = 0.0
     if median_filter:
         f0 = _median5_voiced(f0)
     return t, f0
@@ -69,3 +71,36 @@ def interpolate_unvoiced_in_spans(
             voiced, seg, np.interp(seg_t, seg_t[voiced], seg[voiced])
         )
     return out
+
+
+def range_from_f0(
+    f0: np.ndarray,
+    q_low: float = 0.75,
+    q_high: float = 1.5,
+    floor_min: float = 50.0,
+    ceil_max: float = 600.0,
+    default: tuple[float, float] = (60.0, 500.0),
+) -> tuple[float, float]:
+    """第 1 パスの F0 分布から抽出レンジを推定する。
+
+    floor = q_low * Q25, ceil = q_high * Q75(有声フレームの四分位)。
+    有声フレームが 20 未満なら default を返す。
+    """
+    voiced = f0[f0 > 0]
+    if len(voiced) < 20:
+        return default
+    q25, q75 = np.percentile(voiced, [25, 75])
+    floor = max(floor_min, q_low * float(q25))
+    ceil = min(ceil_max, max(q_high * float(q75), floor * 2.0))
+    return float(floor), float(ceil)
+
+
+def estimate_speaker_range(
+    x: np.ndarray, sr: int, frame_shift_ms: float = 5.0
+) -> tuple[float, float]:
+    """広域(60–600 Hz)の第 1 パスからレンジを推定する(単一ファイル用)。"""
+    f0, t = pyworld.harvest(
+        x, sr, f0_floor=60.0, f0_ceil=600.0, frame_period=frame_shift_ms
+    )
+    f0 = pyworld.stonemask(x, f0, t, sr)
+    return range_from_f0(f0)

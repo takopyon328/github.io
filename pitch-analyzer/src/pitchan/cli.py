@@ -77,6 +77,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_me.add_argument("--f0-ceil", type=float, default=500.0)
     p_me.add_argument("--frame-shift", type=float, default=5.0, help="ms")
     p_me.add_argument("--median-filter", action="store_true")
+    p_me.add_argument("--adaptive-range", action="store_true",
+                      help="このファイルの 2 パス推定で f0_floor/f0_ceil を決める")
     p_me.add_argument(
         "--ref", default="file",
         help="半音変換の基準: file / value:<Hz>(既定 file)。"
@@ -99,6 +101,9 @@ def _build_parser() -> argparse.ArgumentParser:
                        help="AP 内の無声区間を線形補間する")
         p.add_argument("--median-filter", action="store_true",
                        help="F0 に 5 点メディアンフィルタを適用する")
+        p.add_argument("--adaptive-range", action="store_true",
+                       help="話者ごとに 2 パスで f0_floor/f0_ceil を推定する"
+                            "(第1パス 60–600 Hz の四分位から 0.75*Q25 / 1.5*Q75)")
         p.add_argument("--plot", action="store_true", help="PNG 可視化を出力する")
         p.add_argument("--plot-ap", action="store_true",
                        help="アクセント句ごとの PNG を <name>_ap_plots/ に出力する")
@@ -188,9 +193,33 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         all_phones[item.name] = phones
 
     # (3) F0 抽出
+    ranges: dict[str, tuple[float, float]] = {
+        pr.name: (args.f0_floor, args.f0_ceil) for pr in pairs
+    }
+    if getattr(args, "adaptive_range", False):
+        logger.info("F0 レンジ推定中 (2 パス, jobs=%d)...", args.jobs)
+        pre_tasks = [
+            (pr.wav, 60.0, 600.0, args.frame_shift, False) for pr in pairs
+        ]
+        if args.jobs > 1 and len(pairs) > 1:
+            with ProcessPoolExecutor(max_workers=args.jobs) as ex:
+                pre = list(ex.map(_extract_f0_worker, pre_tasks))
+        else:
+            pre = [_extract_f0_worker(t) for t in pre_tasks]
+        by_spk: dict[str, list[np.ndarray]] = {}
+        for pr, (_, f0_1, _) in zip(pairs, pre):
+            by_spk.setdefault(pr.speaker, []).append(f0_1)
+        spk_range = {
+            spk: f0mod.range_from_f0(np.concatenate(arrs))
+            for spk, arrs in by_spk.items()
+        }
+        for pr in pairs:
+            ranges[pr.name] = spk_range[pr.speaker]
+        for spk, (lo, hi) in sorted(spk_range.items()):
+            logger.info("  %s: f0_floor=%.1f, f0_ceil=%.1f", spk, lo, hi)
     logger.info("F0 抽出中 (WORLD harvest, jobs=%d)...", args.jobs)
     tasks = [
-        (pr.wav, args.f0_floor, args.f0_ceil, args.frame_shift, args.median_filter)
+        (pr.wav, *ranges[pr.name], args.frame_shift, args.median_filter)
         for pr in pairs
     ]
     if args.jobs > 1 and len(pairs) > 1:
@@ -214,6 +243,7 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         ref_hz, mu, sigma = refs[pr.name]
         f0_st = normalize.to_semitone(f0_hz, ref_hz)
         f0_z = normalize.to_log_z(f0_hz, mu, sigma)
+        segment.flag_low_confidence_f0(aps, times, f0_raw)
 
         frames = outputs.build_frames_df(pr.name, times, f0_hz, f0_st, f0_z, aps)
         summary = outputs.build_ap_summary_df(pr.name, times, f0_st, aps)
@@ -235,7 +265,8 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         contours.to_csv(out_dir / f"{pr.name}_ap_contours.csv", **enc)
         params = {
             "speaker": pr.speaker, "ref_hz": round(ref_hz, 2),
-            "f0_floor": args.f0_floor, "f0_ceil": args.f0_ceil,
+            "f0_floor": round(ranges[pr.name][0], 1),
+            "f0_ceil": round(ranges[pr.name][1], 1),
             "frame_shift_ms": args.frame_shift,
             "interpolate": args.interpolate, "norm_points": args.norm_points,
         }
@@ -270,8 +301,14 @@ def run_xjtobi_measure(args) -> None:
     logger.info("%s: %d アクセント句を読み取りました", args.textgrid.name, len(laps))
 
     x, sr = f0mod.load_wav(str(args.wav))
+    floor, ceil = args.f0_floor, args.f0_ceil
+    if getattr(args, "adaptive_range", False):
+        floor, ceil = f0mod.estimate_speaker_range(
+            x, sr, frame_shift_ms=args.frame_shift
+        )
+        logger.info("adaptive range: f0_floor=%.1f, f0_ceil=%.1f", floor, ceil)
     times, f0 = f0mod.extract_f0(
-        x, sr, f0_floor=args.f0_floor, f0_ceil=args.f0_ceil,
+        x, sr, f0_floor=floor, f0_ceil=ceil,
         frame_shift_ms=args.frame_shift, median_filter=args.median_filter,
     )
     if args.ref.startswith("value:"):
