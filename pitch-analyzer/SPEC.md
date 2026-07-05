@@ -146,13 +146,25 @@ pitchan analyze --wav recording.wav --from-textgrid fixed.TextGrid --out results
   メディアンフィルタ(5点)を提供。
 - 複数話者が混在する音声、歌唱、自発音声(フィラー・言い淀み多数)は対象外。
 
-## 7.5 簡易版 X-JToBI 下書き出力(追加機能)
+## 7.5 簡易版 X-JToBI 対応(追加機能)
 
-五十嵐(2015)の簡易版 X-JToBI に準拠した 4 層(segments / tones / words / BI)の
-TextGrid を自動生成する(`--xjtobi`)。核記号・BI=2 はテキスト予測(規範)、
-BI=3 は実ポーズ(≥0.2 秒)による検出、tones 層は句末最終音素区間の F0 形状に
-よる BPM 規則判定(H% / LH% / HL%、ドラフト品質)。人手修正を前提とした
-プリラベルであり、`ap_summary.csv` に `bpm_auto` 列を併記する。
+五十嵐(2015)の簡易版 X-JToBI の全要素に対応する。
+
+1. **下書き生成**(`--xjtobi`): 4 層(segments / tones / words+核記号 / BI)の
+   TextGrid を自動生成。核記号・BI=2 はテキスト予測(規範)、BI=3 は実ポーズ
+   (≥0.2 秒)による検出。tones 層には %L / H- / H*+L の規範トーン(近似位置)と
+   句末 L%(+BPM 連結)を配置。
+2. **BPM 自動判定**: 転回点分析により 4 種すべて(H% / LH% / HL% / HLH%)を判定。
+   判定区間は分節音層から特定した最終モーラ(末尾の母音的音素の開始〜句末)。
+   `ap_summary.csv` に `bpm_auto` 列、五十嵐方式の `peak_excl_bpm_st/_time` 列を併記。
+3. **ラベル駆動計測**(`xjtobi-measure`): 手修正済み TextGrid を読み戻し、
+   修正後の核記号(words 層の ')・句境界(BI 層の 2/3)・BPM(tones 層)に
+   基づいて F0 を計測する(資料 p.14-23 の手順の実装)。
+   出力: `<name>_xjtobi_measures.csv`。
+
+既知の限界: 分節音層は MFA の IPA 表記であり CSJ 式の分節音ラベル(無声化記号
+等)ではない。フル版 X-JToBI の BI 細分記号(2+p 等)・韻律的際立ち(PNLP 等)は
+簡易版の対象外のため扱わない。
 
 ## 8. 段階的実装計画
 

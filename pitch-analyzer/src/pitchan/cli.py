@@ -31,6 +31,9 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
     try:
+        if args.command == "xjtobi-measure":
+            run_xjtobi_measure(args)
+            return 0
         if args.command == "analyze":
             pairs = [Pair(args.speaker, args.wav.stem, args.wav, args.text)]
         else:
@@ -61,6 +64,25 @@ def _build_parser() -> argparse.ArgumentParser:
         "--dir", type=Path, required=True,
         help="同名の .wav/.txt を置いたディレクトリ。話者別サブディレクトリ可",
     )
+
+    p_me = sub.add_parser(
+        "xjtobi-measure",
+        help="手修正済みの簡易版 X-JToBI TextGrid から F0 を計測する",
+    )
+    p_me.add_argument("--wav", type=Path, required=True)
+    p_me.add_argument("--textgrid", type=Path, required=True,
+                      help="修正済みの <name>_xjtobi.TextGrid")
+    p_me.add_argument("--out", type=Path, required=True, help="出力ディレクトリ")
+    p_me.add_argument("--f0-floor", type=float, default=60.0)
+    p_me.add_argument("--f0-ceil", type=float, default=500.0)
+    p_me.add_argument("--frame-shift", type=float, default=5.0, help="ms")
+    p_me.add_argument("--median-filter", action="store_true")
+    p_me.add_argument(
+        "--ref", default="file",
+        help="半音変換の基準: file / value:<Hz>(既定 file)。"
+             "batch の結果と比較する場合は該当 json の ref_hz を value: で指定",
+    )
+    p_me.add_argument("--bom", action="store_true")
 
     for p in (p_an, p_ba):
         p.add_argument("--out", type=Path, required=True, help="出力ディレクトリ")
@@ -236,6 +258,44 @@ def run_pipeline(pairs: list[Pair], args) -> None:
             pr.name, len(aps), n_low, ref_hz,
         )
     logger.info("完了: %s", out_dir)
+
+
+def run_xjtobi_measure(args) -> None:
+    """手修正済み簡易版 X-JToBI TextGrid に基づく F0 計測(ラベル駆動)。"""
+    import pandas as pd
+
+    laps, segments = tobi.parse_xjtobi_textgrid(args.textgrid)
+    if not laps:
+        raise ValueError(f"{args.textgrid}: アクセント句が読み取れませんでした")
+    logger.info("%s: %d アクセント句を読み取りました", args.textgrid.name, len(laps))
+
+    x, sr = f0mod.load_wav(str(args.wav))
+    times, f0 = f0mod.extract_f0(
+        x, sr, f0_floor=args.f0_floor, f0_ceil=args.f0_ceil,
+        frame_shift_ms=args.frame_shift, median_filter=args.median_filter,
+    )
+    if args.ref.startswith("value:"):
+        ref_hz = float(args.ref.split(":", 1)[1])
+    elif args.ref == "file":
+        ref_hz, _, _ = normalize.speaker_reference([f0])
+    else:
+        raise ValueError(f"--ref の値が不正です: {args.ref}(file / value:<Hz>)")
+    f0_st = normalize.to_semitone(f0, ref_hz)
+
+    rows = tobi.measure_labeled_aps(
+        times, f0_st, laps, segments, args.wav.stem
+    )
+    df = pd.DataFrame(rows)
+    args.out.mkdir(parents=True, exist_ok=True)
+    out_path = args.out / f"{args.wav.stem}_xjtobi_measures.csv"
+    df.to_csv(
+        out_path, index=False, encoding="utf-8-sig" if args.bom else "utf-8"
+    )
+    n_bpm = sum(1 for r in rows if r["bpm"])
+    logger.info(
+        "完了: %s (%d AP, 有核 %d, BPM %d, ref=%.1f Hz)",
+        out_path, len(rows), sum(r["accented"] for r in rows), n_bpm, ref_hz,
+    )
 
 
 def _compute_refs(pairs, f0_data, ref_opt: str) -> dict[str, tuple[float, float, float]]:

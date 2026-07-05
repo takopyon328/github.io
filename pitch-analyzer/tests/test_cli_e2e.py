@@ -95,3 +95,41 @@ def test_e2e_missing_mfa(tmp_path, monkeypatch):
     (data_dir / "a.txt").write_text(TEXT, encoding="utf-8")
     rc = main(["batch", "--dir", str(data_dir), "--out", str(tmp_path / "o")])
     assert rc == 1  # mfa 不在の明確なエラーで終了
+
+
+def test_e2e_xjtobi_measure(tmp_path):
+    """手修正済み TextGrid からのラベル駆動計測(MFA 不要)。"""
+    from pitchan import segment, tobi
+    from pitchan.textproc import analyze_text
+
+    aps = analyze_text(TEXT)
+    t = 0.5
+    intervals = []
+    for ap in aps:
+        for w in ap.words:
+            intervals.append((t, t + 0.3, w.pron))
+            t += 0.3
+    segment.assign_times(aps, intervals)
+    dur = t + 0.5
+
+    wav = tmp_path / "rec.wav"
+    _make_wav(wav, duration=dur)
+
+    phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
+    times = np.arange(0, dur, 0.005)
+    f0 = np.full_like(times, 0.0)
+    tg_path = tmp_path / "rec_xjtobi.TextGrid"
+    tobi.write_xjtobi_textgrid(tg_path, aps, phones, dur, times, f0)
+
+    out = tmp_path / "out"
+    rc = main([
+        "xjtobi-measure", "--wav", str(wav), "--textgrid", str(tg_path),
+        "--out", str(out),
+    ])
+    assert rc == 0
+    df = pd.read_csv(out / "rec_xjtobi_measures.csv")
+    assert len(df) == len(aps)
+    assert set(["ap_kana", "nucleus_mora", "bi", "bpm",
+                "peak_excl_bpm_st"]) <= set(df.columns)
+    # 150 Hz 一定の合成音 → 半音値ほぼ 0
+    assert df["f0_max_st"].abs().max() < 1.0

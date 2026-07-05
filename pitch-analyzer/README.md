@@ -94,6 +94,31 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 | `words` | カナ単語+アクセント核記号 `'`(例: ヤマナシダ'イガク) | テキスト予測(東京方言の規範) |
 | `BI` | 1=語境界 / 2=アクセント句境界 / 3=イントネーション句境界(ポイント層) | 1・2 はテキスト予測、3 は実ポーズ(0.2 秒以上)で検出 |
 
+BPM の自動判定は X-JToBI の 4 種すべてに対応しています:
+`H%`(上昇調1)/ `LH%`(上昇調2)/ `HL%`(上昇下降調)/ `HLH%`(上昇下降上昇調)。
+H% と LH% は X-JToBI の弁別基準に従い**上昇開始の時間的な遅れ**で分けます
+(上昇開始が最終モーラの前半なら H%、後半まで低く保たれてから上昇するなら LH%)。
+判定区間は資料の手順どおり分節音層から特定した**最終モーラ**です(末尾の母音的
+音素の開始〜句末。長母音 `ː` 末の句では音素の後半のみ)。
+
+### 手修正後のラベル駆動計測(`xjtobi-measure`)
+
+`<name>_xjtobi.TextGrid` を Praat で手修正(核記号の移動・削除、BI の変更、BPM の追加・修正)
+した後、**修正後のラベルに基づいて** F0 を計測し直せます(五十嵐方式の分析手順):
+
+```bash
+pitchan xjtobi-measure --wav rec.wav --textgrid rec_xjtobi_fixed.TextGrid --out results/ --bom
+```
+
+`<name>_xjtobi_measures.csv` が生成されます:
+`ap_kana / nucleus_mora(核記号の位置。0=平板)/ accented / t_start / t_end / bi / bpm /`
+`f0_mean_st / f0_max_st / f0_max_time / peak_excl_bpm_st / peak_excl_bpm_time / voiced_ratio`
+
+- 句の区切りは **BI 層の 2・3 の位置**から、核は **words 層の `'` の位置**から、
+  BPM は **tones 層のラベル**から読み取ります。手修正がそのまま計測に反映されます。
+- 半音変換の基準は既定でそのファイル単体(`--ref file`)。batch の結果と比較する場合は、
+  該当ファイルの `.json` にある `ref_hz` を `--ref value:<Hz>` で指定してください。
+
 - 核記号と BI=2 は**規範(予測)**です。実際の発話の記述としては Praat 上で手修正してください。
   修正前(規範)と修正後(実現)の差分が、話者の韻律的逸脱のデータになります。
 - BPM の自動判定はドラフト品質です。`ap_summary.csv` の `bpm_auto` 列にも同じ判定が

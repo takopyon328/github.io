@@ -150,3 +150,189 @@ def test_write_xjtobi_textgrid(aps_with_times, tmp_path):
     assert "%L" in tone_labels
     assert "H*+L" in tone_labels
     assert any(lab.startswith("L%") for lab in tone_labels)
+
+
+def test_classify_bpm_lh(aps_with_times):
+    """LH%(上昇調2)= 最終モーラの後半まで低く保たれてから上昇する。"""
+    ap = aps_with_times[-1]
+    phones = [(ap.t_start, ap.t_end - 0.2, "x"), (ap.t_end - 0.2, ap.t_end, "a")]
+    times = _times_grid(0, ap.t_end + 0.1)
+    f0 = np.zeros_like(times)
+    sel = (times >= ap.t_end - 0.2) & (times <= ap.t_end)
+    n = sel.sum()
+    k = int(n * 0.65)
+    f0[sel] = np.concatenate(
+        [np.zeros(k), np.linspace(0, 5, n - k)]
+    )  # 低平坦 65% → 遅れて 5 半音上昇
+    assert tobi.classify_bpm(times, f0, phones, ap) == "LH%"
+
+
+def test_classify_bpm_early_rise_is_h(aps_with_times):
+    """先行するアクセント下降が食い込んだだけの早い上昇は H% と判定する。"""
+    ap = aps_with_times[-1]
+    phones = [(ap.t_start, ap.t_end - 0.2, "x"), (ap.t_end - 0.2, ap.t_end, "a")]
+    times = _times_grid(0, ap.t_end + 0.1)
+    f0 = np.zeros_like(times)
+    sel = (times >= ap.t_end - 0.2) & (times <= ap.t_end)
+    n = sel.sum()
+    k = n // 4
+    f0[sel] = np.concatenate(
+        [np.linspace(3, 0, k), np.linspace(0, 5, n - k)]
+    )  # 前半 25% で核由来の下降 → すぐ上昇
+    assert tobi.classify_bpm(times, f0, phones, ap) == "H%"
+
+
+def test_classify_bpm_hlh(aps_with_times):
+    ap = aps_with_times[-1]
+    phones = [(ap.t_start, ap.t_end - 0.3, "x"), (ap.t_end - 0.3, ap.t_end, "a")]
+    times = _times_grid(0, ap.t_end + 0.1)
+    f0 = np.zeros_like(times)
+    sel = (times >= ap.t_end - 0.3) & (times <= ap.t_end)
+    n = sel.sum()
+    k = n // 3
+    f0[sel] = np.concatenate(
+        [np.linspace(0, 4, k), np.linspace(4, 1, k), np.linspace(1, 5, n - 2 * k)]
+    )  # 上昇→下降→上昇
+    assert tobi.classify_bpm(times, f0, phones, ap) == "HLH%"
+
+
+def test_bpm_region_uses_final_vowel(aps_with_times):
+    """最終モーラ=「子音+母音」のとき、母音の開始が区間の起点になる。"""
+    ap = aps_with_times[0]
+    phones = [
+        (ap.t_start, ap.t_end - 0.3, "w"),
+        (ap.t_end - 0.3, ap.t_end - 0.1, "k"),   # 最終モーラの子音
+        (ap.t_end - 0.1, ap.t_end, "a"),          # 最終モーラの母音
+    ]
+    region = tobi._bpm_region(phones, ap)
+    assert region == (ap.t_end - 0.1, ap.t_end)
+
+
+def test_parse_roundtrip(aps_with_times, tmp_path):
+    """write → parse で AP 構造・核位置・BI が復元できる。"""
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
+    times = _times_grid(0, dur)
+    f0 = np.full_like(times, 1.0)  # 平坦 → BPM なし
+    path = tmp_path / "rt.TextGrid"
+    tobi.write_xjtobi_textgrid(path, aps, phones, dur, times, f0)
+
+    laps, segments = tobi.parse_xjtobi_textgrid(path)
+    assert len(laps) == len(aps)
+    for lap, ap in zip(laps, aps):
+        assert lap.kana == ap.kana
+        assert lap.nucleus_mora == (ap.accent_type or 0)
+        assert lap.t_start == pytest.approx(ap.t_start)
+        assert lap.t_end == pytest.approx(ap.t_end)
+        assert lap.bpm == ""
+    assert len(segments) == len(phones)
+    # ポーズを挟む AP1 の右端は BI=3、隣接する AP0 は BI=2
+    assert laps[0].bi == "2"
+    assert laps[1].bi == "3"
+
+
+def test_parse_reflects_manual_edits(aps_with_times, tmp_path):
+    """手修正(核の移動・削除、BPM の追加)が解析に反映される。"""
+    from praatio import textgrid as ptg
+
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    tg = ptg.Textgrid()
+    word_entries = []
+    for ap in aps:
+        for w, lab in zip(ap.words, tobi.nucleus_marked_words(ap)):
+            word_entries.append((w.t_start, w.t_end, lab))
+    # 手修正の模擬: AP0 の核を削除(平板化)、AP1 の核を 5→3 モーラ目に移動
+    word_entries[1] = (word_entries[1][0], word_entries[1][1], "ワ")
+    word_entries[2] = (word_entries[2][0], word_entries[2][1], "ヤマナ'シダイガク")
+    tg.addTier(ptg.IntervalTier("words", word_entries, 0, dur))
+    tg.addTier(ptg.PointTier("BI", tobi.bi_points(aps), 0, dur))
+    # 手修正の模擬: 最終 AP に BPM を追加
+    tg.addTier(ptg.PointTier("tones", [(aps[-1].t_end, "L%HLH%")], 0, dur))
+    path = tmp_path / "edited.TextGrid"
+    tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)
+
+    laps, _ = tobi.parse_xjtobi_textgrid(path)
+    assert laps[0].nucleus_mora == 0        # 核削除 → 平板
+    assert laps[1].nucleus_mora == 3        # 核移動
+    assert laps[-1].bpm == "HLH%"           # BPM 追加
+
+
+def test_measure_labeled_aps(aps_with_times, tmp_path):
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
+    times = _times_grid(0, dur)
+    f0 = np.full_like(times, 2.0)
+    path = tmp_path / "m.TextGrid"
+    tobi.write_xjtobi_textgrid(path, aps, phones, dur, times, f0)
+    laps, segments = tobi.parse_xjtobi_textgrid(path)
+
+    rows = tobi.measure_labeled_aps(times, f0, laps, segments, "m")
+    assert len(rows) == len(aps)
+    assert all(r["f0_max_st"] == pytest.approx(2.0) for r in rows)
+    assert all(r["accented"] == 1 for r in rows)  # 4 句とも有核
+
+
+def test_bpm_region_long_vowel_second_half(aps_with_times):
+    """長母音(ː)末の句では、音素の後半のみが最終モーラ相当になる。"""
+    ap = aps_with_times[0]
+    phones = [
+        (ap.t_start, ap.t_end - 0.4, "s"),
+        (ap.t_end - 0.4, ap.t_end, "oː"),  # 長母音 400ms = 2 モーラ
+    ]
+    region = tobi._bpm_region(phones, ap)
+    assert region == pytest.approx((ap.t_end - 0.2, ap.t_end))
+
+
+def test_bpm_region_survives_boundary_edit(aps_with_times):
+    """語末が手修正で 30ms 詰められても最終母音を取り落とさない(重なり判定+クリップ)。"""
+    ap = aps_with_times[0]
+    orig_end = ap.t_end
+    phones = [
+        (ap.t_start, orig_end - 0.1, "t"),
+        (orig_end - 0.1, orig_end, "a"),  # segments は元の境界のまま
+    ]
+    ap.words[-1].t_end = orig_end - 0.03  # words 層だけ 30ms 詰めた
+    ap.t_end = orig_end - 0.03
+    region = tobi._bpm_region(phones, ap)
+    assert region == pytest.approx((orig_end - 0.1, orig_end - 0.03))
+
+
+def test_parse_tolerates_drifted_bi(aps_with_times, tmp_path):
+    """BI ポイントが語末から 40ms ずれていても句の分割が保たれる。"""
+    from praatio import textgrid as ptg
+
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    tg = ptg.Textgrid()
+    word_entries = [
+        (w.t_start, w.t_end, lab)
+        for ap in aps
+        for w, lab in zip(ap.words, tobi.nucleus_marked_words(ap))
+    ]
+    tg.addTier(ptg.IntervalTier("words", word_entries, 0, dur))
+    drifted = [
+        (t + (0.04 if lab in ("2", "3") else 0.0), lab)
+        for t, lab in tobi.bi_points(aps)
+    ]
+    tg.addTier(ptg.PointTier("BI", drifted, 0, dur))
+    path = tmp_path / "drift.TextGrid"
+    tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)
+
+    laps, _ = tobi.parse_xjtobi_textgrid(path)
+    assert len(laps) == len(aps)
+    assert [lap.kana for lap in laps] == [ap.kana for ap in aps]
+
+
+def test_peak_excl_bpm_nan_without_segments(aps_with_times):
+    """BPM 付きなのに分節音情報がない場合は誤値でなく NaN を返す。"""
+    ap = aps_with_times[-1]
+    times = _times_grid(0, ap.t_end + 0.1)
+    f0 = np.full_like(times, 2.0)
+    st, t = tobi.peak_excl_bpm(times, f0, [], ap, "H%")
+    assert np.isnan(st) and np.isnan(t)
+    # BPM なしなら segments がなくても全区間で計測できる
+    st2, _ = tobi.peak_excl_bpm(times, f0, [], ap, "")
+    assert st2 == pytest.approx(2.0)
