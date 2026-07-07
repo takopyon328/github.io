@@ -10,8 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 
-from . import align, f0 as f0mod, normalize, outputs, segment, textproc, tobi
+from . import align, f0 as f0mod, normalize, outputs, segment, split, textproc, tobi
 
 logger = logging.getLogger("pitchan")
 
@@ -104,9 +105,15 @@ def _build_parser() -> argparse.ArgumentParser:
         p.add_argument("--adaptive-range", action="store_true",
                        help="話者ごとに 2 パスで f0_floor/f0_ceil を推定する"
                             "(第1パス 60–600 Hz の四分位から 0.75*Q25 / 1.5*Q75)")
+        p.add_argument("--split-sentences", action="store_true",
+                       help="文末記号と無音検出でファイルを文単位に分割して"
+                            "アラインメントする(言い淀み・長尺への頑健化)")
         p.add_argument("--plot", action="store_true", help="PNG 可視化を出力する")
         p.add_argument("--plot-ap", action="store_true",
                        help="アクセント句ごとの PNG を <name>_ap_plots/ に出力する")
+        p.add_argument("--plot-ap-shared-ylim", action="store_true",
+                       help="句ごとの PNG の縦軸をファイル内で共通にする"
+                            "(既定は句ごとの自動スケール)")
         p.add_argument("--xjtobi", action="store_true",
                        help="簡易版 X-JToBI 準拠の TextGrid(下書き)を出力する")
         p.add_argument("--bom", action="store_true",
@@ -155,18 +162,39 @@ def run_pipeline(pairs: list[Pair], args) -> None:
     work_dir = out_dir / "work"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # (1) 言語処理
+    use_split = getattr(args, "split_sentences", False)
+
+    # (1) 言語処理(+ 文単位分割)
     logger.info("言語処理: %d ファイル", len(pairs))
     all_aps: dict[str, list[textproc.AccentPhrase]] = {}
+    utt_map: dict[str, list[split.Utterance]] = {}
     items: list[align.FileItem] = []
+    chunks_dir = work_dir / "chunks"
     for pr in pairs:
         aps = textproc.analyze_text_file(str(pr.text))
         if not aps:
             raise ValueError(f"{pr.text}: アクセント句が得られませんでした")
         all_aps[pr.name] = aps
         tokens = [w.pron for ap in aps for w in ap.words]
-        items.append(align.FileItem(pr.speaker, pr.name, pr.wav, tokens))
         logger.info("  %s: %d アクセント句 / %d 語", pr.name, len(aps), len(tokens))
+        if not use_split:
+            items.append(align.FileItem(pr.speaker, pr.name, pr.wav, tokens))
+            continue
+        x, sr = f0mod.load_wav(str(pr.wav))
+        utts = split.plan_utterances(
+            aps, split.detect_silences(x, sr), len(x) / sr
+        )
+        utt_map[pr.name] = utts
+        n_sent = len({ap.sentence_index for ap in aps})
+        logger.info("    %d 文 → %d 発話に分割", n_sent, len(utts))
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+        for u in utts:
+            chunk_wav = chunks_dir / f"{pr.name}_u{u.index:03d}.wav"
+            sf.write(chunk_wav, x[int(u.t_start * sr): int(u.t_end * sr)], sr)
+            u_tokens = [w.pron for ap in u.aps for w in ap.words]
+            items.append(
+                align.FileItem(pr.speaker, chunk_wav.stem, chunk_wav, u_tokens)
+            )
 
     # (2) 強制アラインメント(コーパス一括)
     align.check_mfa_available()
@@ -182,15 +210,22 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         beam=args.beam, retry_beam=args.retry_beam, num_jobs=args.jobs,
     )
     all_phones: dict[str, list] = {}
-    for item in items:
-        tg_path = aligned_dir / item.speaker / f"{item.name}.TextGrid"
+    for pr in pairs:
+        if use_split:
+            all_phones[pr.name] = _collect_split_alignment(
+                pr, utt_map[pr.name], aligned_dir
+            )
+            continue
+        tg_path = aligned_dir / pr.speaker / f"{pr.name}.TextGrid"
         if not tg_path.exists():
             raise align.AlignmentError(
-                f"{tg_path} が生成されていません(アラインメント失敗)"
+                f"{tg_path} が生成されていません(アラインメント失敗)。"
+                "--split-sentences で文単位に分割すると失敗を局所化できます"
             )
-        words, phones = align.read_word_intervals(tg_path, item.tokens)
-        segment.assign_times(all_aps[item.name], words)
-        all_phones[item.name] = phones
+        tokens = [w.pron for ap in all_aps[pr.name] for w in ap.words]
+        words, phones = align.read_word_intervals(tg_path, tokens)
+        segment.assign_times(all_aps[pr.name], words)
+        all_phones[pr.name] = phones
 
     # (3) F0 抽出
     ranges: dict[str, tuple[float, float]] = {
@@ -282,13 +317,52 @@ def run_pipeline(pairs: list[Pair], args) -> None:
         if args.plot:
             outputs.plot_f0(out_dir / f"{pr.name}_f0.png", times, f0_st, aps)
         if args.plot_ap:
-            outputs.plot_ap_pngs(out_dir / f"{pr.name}_ap_plots", times, f0_st, aps)
+            outputs.plot_ap_pngs(
+                out_dir / f"{pr.name}_ap_plots", times, f0_st, aps,
+                shared_ylim=args.plot_ap_shared_ylim,
+            )
         n_low = sum(ap.low_confidence for ap in aps)
         logger.info(
             "  %s: %d AP 出力 (low_confidence %d 件, ref=%.1f Hz)",
             pr.name, len(aps), n_low, ref_hz,
         )
     logger.info("完了: %s", out_dir)
+
+
+def _collect_split_alignment(
+    pr: Pair, utts: list[split.Utterance], aligned_dir: Path
+) -> list[tuple[float, float, str]]:
+    """発話単位のアラインメント結果を集約する。失敗した発話はスキップする。"""
+    phones_all: list[tuple[float, float, str]] = []
+    n_failed = 0
+    for u in utts:
+        uname = f"{pr.name}_u{u.index:03d}"
+        tg_path = aligned_dir / pr.speaker / f"{uname}.TextGrid"
+        u_tokens = [w.pron for ap in u.aps for w in ap.words]
+        try:
+            if not tg_path.exists():
+                raise align.AlignmentError("TextGrid が生成されていません")
+            words, phones = align.read_word_intervals(tg_path, u_tokens)
+        except align.AlignmentError as e:
+            n_failed += 1
+            for ap in u.aps:
+                ap.low_confidence = True
+            logger.warning(
+                "%s: 発話 %d (%s…) のアラインメントに失敗したためスキップ: %s",
+                pr.name, u.index, u.aps[0].kana[:12], e,
+            )
+            continue
+        offset = u.t_start
+        segment.assign_times(
+            u.aps, [(s + offset, e + offset, lab) for s, e, lab in words]
+        )
+        phones_all.extend((s + offset, e + offset, lab) for s, e, lab in phones)
+    if n_failed:
+        logger.warning(
+            "%s: %d/%d 発話が失敗(該当句は時刻なし・low_confidence で出力)",
+            pr.name, n_failed, len(utts),
+        )
+    return phones_all
 
 
 def run_xjtobi_measure(args) -> None:

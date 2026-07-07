@@ -38,6 +38,7 @@ class AccentPhrase:
     accent_type: int | None = None
     mora_count: int = 0
     follows_pause: bool = False  # 直前がポーズまたは文頭
+    sentence_index: int = 0  # 所属する文の通し番号(文末記号・改行で区切る)
     t_start: float | None = None
     t_end: float | None = None
     low_confidence: bool = False
@@ -175,16 +176,32 @@ def _read_text_file(path: str) -> str:
         ) from e
 
 
+_SENTENCE_END_RE = re.compile(r"(?<=[。!?!?])")
+
+
 def analyze_text_file(path: str) -> list[AccentPhrase]:
-    """テキストファイル全体を解析する。改行・空行はポーズとして扱われる。"""
+    """テキストファイル全体を解析する。改行・空行はポーズとして扱われる。
+
+    文末記号(。!?)と改行で文に区切り、各 AP に sentence_index を付与する。
+    """
     lines = [ln.strip() for ln in _read_text_file(path).splitlines()]
     aps: list[AccentPhrase] = []
+    sentence_index = 0
     for line in lines:
         if not line:
             continue
-        for ap in analyze_text(line):
-            ap.index = len(aps)
-            if not aps:
-                ap.follows_pause = True
-            aps.append(ap)
+        for sent in _SENTENCE_END_RE.split(line):
+            sent = sent.strip()
+            if not sent:
+                continue
+            sent_aps = analyze_text(sent)
+            if not sent_aps:
+                continue
+            for ap in sent_aps:
+                ap.index = len(aps)
+                ap.sentence_index = sentence_index
+                if not aps:
+                    ap.follows_pause = True
+                aps.append(ap)
+            sentence_index += 1
     return aps

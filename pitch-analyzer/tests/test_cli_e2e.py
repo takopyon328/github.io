@@ -133,3 +133,59 @@ def test_e2e_xjtobi_measure(tmp_path):
                 "peak_excl_bpm_st"]) <= set(df.columns)
     # 150 Hz 一定の合成音 → 半音値ほぼ 0
     assert df["f0_max_st"].abs().max() < 1.0
+
+
+def test_e2e_split_sentences(tmp_path, fake_mfa_on_path):
+    """--split-sentences: 2 文が 2 発話に分割され、時刻オフセットが正しく戻る。"""
+    from pitchan.textproc import analyze_text_file
+
+    text2 = "私は山梨大学で音声を研究しています。今日は良い天気です。"
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "sample.txt").write_text(text2, encoding="utf-8")
+
+    aps = analyze_text_file(str(data_dir / "sample.txt"))
+    moras = [
+        sum(a.mora_count for a in aps if a.sentence_index == s) for s in (0, 1)
+    ]
+    n_words = [
+        sum(len(a.words) for a in aps if a.sentence_index == s) for s in (0, 1)
+    ]
+    # fake mfa は 1 語 0.3 秒 + 前後 0.5 秒とみなして各チャンクを整列するので、
+    # モーラ比に応じた位置に 0.6 秒の無音を置いた音声を合成する
+    sr = 16000
+    dur1 = 0.5 + n_words[0] * 0.3 + 0.3
+    dur2 = 0.3 + n_words[1] * 0.3 + 0.5
+    total = dur1 + 0.6 + dur2
+    # 無音位置がモーラ比の予測境界(±3 秒)に入ることを確認しておく
+    expected = total * moras[0] / sum(moras)
+    assert abs((dur1 + 0.3) - expected) < 3.0
+    x = np.zeros(int(sr * total))
+    period = int(sr / 150)
+    x[: int(sr * dur1): period] = 0.5
+    start2 = int(sr * (dur1 + 0.6))
+    x2 = np.zeros(len(x) - start2)
+    x2[::period] = 0.5
+    x[start2:] = x2
+    sf.write(data_dir / "sample.wav", x, sr)
+
+    out_dir = tmp_path / "out"
+    rc = main([
+        "batch", "--dir", str(data_dir), "--out", str(out_dir),
+        "--jobs", "1", "--split-sentences",
+    ])
+    assert rc == 0
+    # チャンクが 2 つ作られている
+    chunks = sorted((out_dir / "work" / "chunks").glob("*.wav"))
+    assert len(chunks) == 2
+    summary = pd.read_csv(out_dir / "sample_ap_summary.csv")
+    assert len(summary) == len(aps)
+    # 全句に時刻が付き、2 文目の句の開始は無音より後(オフセットが効いている)
+    assert summary["t_start"].notna().all()
+    s1_rows = summary[summary["ap_index"] >= n_sent0(aps)]
+    if len(s1_rows):
+        assert (s1_rows["t_start"] >= dur1).all()
+
+
+def n_sent0(aps):
+    return sum(1 for a in aps if a.sentence_index == 0)

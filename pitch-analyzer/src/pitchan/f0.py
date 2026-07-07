@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pyworld
 import soundfile as sf
+
+logger = logging.getLogger(__name__)
+
+# 探索範囲外の値を無声化する際のガード帯(倍率)。境界近傍の真の値
+# (句末の下降や強調のピーク)を誤って消さないための余裕。
+RANGE_GUARD = 1.25
 
 
 def load_wav(path: str) -> tuple[np.ndarray, int]:
@@ -30,8 +38,18 @@ def extract_f0(
         x, sr, f0_floor=f0_floor, f0_ceil=f0_ceil, frame_period=frame_shift_ms
     )
     f0 = pyworld.stonemask(x, f0, t, sr)
-    # harvest は探索上下限の外側の値も返すことがあるため、範囲外を無声(0)にする
-    f0[(f0 > 0) & ((f0 < f0_floor) | (f0 > f0_ceil))] = 0.0
+    # harvest は探索上下限の外側の値も返すことがある。倍・半ピッチ等の明確な
+    # 外れ値のみ無声化し、境界近傍の真の値(句末の下降・強調のピーク)は残す
+    lo, hi = f0_floor / RANGE_GUARD, f0_ceil * RANGE_GUARD
+    out_of_range = (f0 > 0) & ((f0 < lo) | (f0 > hi))
+    n_voiced = int((f0 > 0).sum())
+    if n_voiced and out_of_range.sum() / n_voiced > 0.02:
+        logger.warning(
+            "有声フレームの %.1f%% が探索範囲外で無声化されました。"
+            "f0_floor/f0_ceil が狭すぎる可能性があります (floor=%.0f, ceil=%.0f)",
+            100 * out_of_range.sum() / n_voiced, f0_floor, f0_ceil,
+        )
+    f0[out_of_range] = 0.0
     if median_filter:
         f0 = _median5_voiced(f0)
     return t, f0

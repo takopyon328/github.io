@@ -62,8 +62,9 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 | `--interpolate` | off | アクセント句内の無声区間を線形補間 |
 | `--median-filter` | off | F0 の 5 点メディアンフィルタ(倍/半ピッチ誤り緩和) |
 | `--adaptive-range` | off | 話者ごとに 2 パスで F0 探索範囲を自動推定(第 1 パス 60–600 Hz の有声フレーム四分位から floor=0.75×Q25 / ceil=1.5×Q75)。`--f0-floor/--f0-ceil` の手動指定より優先。実際に使われた値は各 `.json` の `f0_floor/f0_ceil` に記録 |
+| `--split-sentences` | off | **推奨**: 文末記号(。!?・改行)と無音検出でファイルを文単位に分割してアラインメントする。言い淀み等の不一致があってもその文だけの失敗で済み(該当句は `low_confidence`・時刻なしで出力)、長尺ファイルの境界精度も上がる |
 | `--plot` | off | ファイル全体の F0 曲線+句境界の PNG を出力 |
-| `--plot-ap` | off | アクセント句ごとの PNG を `<name>_ap_plots/` に出力(表記・読み・アクセント型・単語境界つき。縦軸はファイル内共通) |
+| `--plot-ap` | off | アクセント句ごとの PNG を `<name>_ap_plots/` に出力(表記・読み・アクセント型・単語境界つき)。縦軸は既定で**句ごとの自動スケール**(最小スパン 8 半音)。句どうしの高さ比較には `--plot-ap-shared-ylim` でファイル内共通スケールに切替 |
 | `--xjtobi` | off | 簡易版 X-JToBI(五十嵐 2015)準拠の TextGrid 下書きを `<name>_xjtobi.TextGrid` に出力 |
 | `--bom` | off | CSV を BOM 付き UTF-8 で出力(Excel で開く場合) |
 | `--jobs` | 4 | 並列数(F0 抽出と MFA に適用) |

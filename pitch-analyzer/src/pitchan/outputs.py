@@ -251,15 +251,21 @@ def plot_f0(
     plt.close(fig)
 
 
+MIN_AP_PLOT_SPAN_ST = 8.0  # 句ごと自動スケール時の縦軸の最小スパン(半音)
+
+
 def plot_ap_pngs(
     dir_path: Path,
     times: np.ndarray,
     f0_st: np.ndarray,
     aps: list[AccentPhrase],
+    shared_ylim: bool = False,
 ) -> None:
     """アクセント句ごとに 1 枚の PNG を出力する。
 
-    縦軸スケールはファイル内で共通にし、句どうしの高さ・形状を比較できるようにする。
+    既定では縦軸を句ごとに自動スケールし(最小スパン 8 半音)、句内の
+    上昇・下降が見やすいようにする。shared_ylim=True でファイル内共通の
+    スケールに切り替えられる(句どうしの高さの比較用)。
     """
     plt = _setup_matplotlib()
     if plt is None:
@@ -268,16 +274,28 @@ def plot_ap_pngs(
 
     voiced = f0_st[~np.isnan(f0_st)]
     if len(voiced):
-        ylo, yhi = np.percentile(voiced, [1, 99])
-        pad = max(1.0, 0.1 * (yhi - ylo))
-        ylo, yhi = ylo - pad, yhi + pad
+        glo, ghi = np.percentile(voiced, [1, 99])
+        pad = max(1.0, 0.1 * (ghi - glo))
+        glo, ghi = glo - pad, ghi + pad
     else:
-        ylo, yhi = -12, 12
+        glo, ghi = -12, 12
 
     for ap in aps:
         if ap.t_start is None:
             continue
         sel = (times >= ap.t_start) & (times <= ap.t_end)
+        if shared_ylim:
+            ylo, yhi = glo, ghi
+        else:
+            v = f0_st[sel]
+            v = v[~np.isnan(v)]
+            if len(v):
+                mid = (float(v.min()) + float(v.max())) / 2
+                span = max(float(v.max()) - float(v.min()) + 2.0,
+                           MIN_AP_PLOT_SPAN_ST)
+                ylo, yhi = mid - span / 2, mid + span / 2
+            else:
+                ylo, yhi = glo, ghi
         fig, ax = plt.subplots(figsize=(6.4, 3.2))
         ax.plot(times[sel] - ap.t_start, f0_st[sel], ".", markersize=4, color="C0")
         for w in ap.words:

@@ -64,12 +64,12 @@ def test_range_from_f0():
 
 
 def test_extract_f0_zeroes_out_of_range():
-    from pitchan.f0 import extract_f0
+    from pitchan.f0 import RANGE_GUARD, extract_f0
 
     sr = 16000
     x = np.zeros(sr)
     period = int(sr / 100)  # 100 Hz のパルス列
     x[::period] = 0.5
     _, f0 = extract_f0(x, sr, f0_floor=150.0, f0_ceil=400.0)
-    # 100 Hz は範囲外なので有声フレームに 150 未満の値が残らない
-    assert not ((f0 > 0) & (f0 < 150.0)).any()
+    # 100 Hz はガード帯(150/1.25=120 Hz)より下なので無声化される
+    assert not ((f0 > 0) & (f0 < 150.0 / RANGE_GUARD)).any()
