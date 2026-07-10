@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 from praatio import textgrid as ptg
 
-from .textproc import AccentPhrase, split_moras
+from .textproc import AccentPhrase, lexical_accent, split_moras
 
 logger = logging.getLogger(__name__)
 
@@ -286,12 +286,20 @@ def write_xjtobi_textgrid(
     tg.addTier(ptg.PointTier("tones", tone_points(aps, bpm), 0, duration))
 
     word_entries = []
+    pred_entries = []
     for ap in aps:
         if ap.t_start is None:
             continue
         for w, label in zip(ap.words, nucleus_marked_words(ap)):
             word_entries.append((w.t_start, w.t_end, label))
+            lex = lexical_accent(w.surface)
+            pred_entries.append(
+                (w.t_start, w.t_end, f"{label}/{lex if lex is not None else '?'}")
+            )
     tg.addTier(ptg.IntervalTier("words", word_entries, 0, duration))
+    # words_pred: 予測(規範)の凍結コピー+辞書型(/N)。手修正の対象外とし、
+    # 修正後の words 層との対照(実現 vs 予測)を 1 ファイルで可能にする
+    tg.addTier(ptg.IntervalTier("words_pred", pred_entries, 0, duration))
 
     tg.addTier(ptg.PointTier("BI", bi_points(aps), 0, duration))
     tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)
@@ -365,6 +373,9 @@ class LabeledAP:
     words: list[tuple[float, float, str]] = field(default_factory=list)
     bi: str = ""  # この句の右端の BI(2 / 3)
     bpm: str = ""  # tones 層由来の BPM(修正後の値)
+    # words_pred 層由来(存在する場合)。words と同じ順の予測ラベルと辞書型
+    pred_labels: list[str] | None = None
+    lex_accents: list[int | None] | None = None
 
     @property
     def t_start(self) -> float:
@@ -478,6 +489,31 @@ def parse_xjtobi_textgrid(
             )
             cur = []
 
+    # words_pred 層(予測の凍結コピー)があれば語順で対応付ける
+    pred_name = find_tier("words_pred")
+    if pred_name is not None:
+        pred_entries = [
+            e.label.strip()
+            for e in tg.getTier(pred_name).entries
+            if e.label.strip()
+        ]
+        if len(pred_entries) == len(words):
+            it = iter(pred_entries)
+            for ap in aps:
+                labels, lexes = [], []
+                for _ in ap.words:
+                    raw = next(it)
+                    label, _, lex = raw.partition("/")
+                    labels.append(label)
+                    lexes.append(int(lex) if lex.isdigit() else None)
+                ap.pred_labels = labels
+                ap.lex_accents = lexes
+        else:
+            logger.warning(
+                "%s: words_pred の語数 (%d) が words (%d) と一致しないため"
+                "予測との対照をスキップします", path, len(pred_entries), len(words),
+            )
+
     # tones 層の BPM を最寄りの句末に割り当てる
     for t, lab in tone_points_:
         bpm = _bpm_from_tone_label(lab)
@@ -539,3 +575,68 @@ def measure_labeled_aps(
         row["peak_excl_bpm_time"] = round(peak_t, 4)
         rows.append(row)
     return rows
+
+
+def _accent_of(label: str) -> int:
+    """語ラベル中の核記号 ' の位置(語内モーラ番号)を返す。核なしは 0。"""
+    if "'" not in label:
+        return 0
+    return len(split_moras(label.split("'")[0]))
+
+
+def _accent_match(realized: int, predicted: int) -> str:
+    if realized == predicted:
+        return "match"
+    if realized == 0:
+        return "deleted"   # 予測にある核が実現されていない
+    if predicted == 0:
+        return "inserted"  # 予測にない核が実現された
+    return "shifted"       # 核はあるが位置が違う
+
+
+def word_accent_rows(aps: list[LabeledAP], file_name: str) -> list[dict]:
+    """語ごとの実現アクセント型と予測・辞書型の対照行を返す。
+
+    実現型 = 修正後 words 層の核記号位置(語内モーラ番号、0=核なし)。
+    予測型 = words_pred 層(OpenJTalk の文脈予測)。辞書型 = 語単独の型。
+    """
+    rows = []
+    for ap in aps:
+        for wi, (t0, t1, label) in enumerate(ap.words):
+            realized = _accent_of(label)
+            row: dict = {
+                "file": file_name,
+                "ap_index": ap.index,
+                "word_index": wi,
+                "word_kana": label.replace("'", ""),
+                "t_start": round(t0, 4),
+                "t_end": round(t1, 4),
+                "realized_accent": realized,
+            }
+            if ap.pred_labels is not None:
+                predicted = _accent_of(ap.pred_labels[wi])
+                row["predicted_accent"] = predicted
+                row["accent_match"] = _accent_match(realized, predicted)
+                row["lexical_accent"] = ap.lex_accents[wi]
+            rows.append(row)
+    return rows
+
+
+def write_accent_textgrid(path: Path, aps: list[LabeledAP]) -> None:
+    """実現アクセント型の層(accent_est)を持つ TextGrid を書き出す。
+
+    tier: words(修正後ラベル)/ accent_est(語ごとの実現型。0=核なし)
+    """
+    if not aps:
+        return
+    duration = aps[-1].t_end
+    word_entries = []
+    accent_entries = []
+    for ap in aps:
+        for t0, t1, label in ap.words:
+            word_entries.append((t0, t1, label))
+            accent_entries.append((t0, t1, str(_accent_of(label))))
+    tg = ptg.Textgrid()
+    tg.addTier(ptg.IntervalTier("words", word_entries, 0, duration))
+    tg.addTier(ptg.IntervalTier("accent_est", accent_entries, 0, duration))
+    tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)

@@ -140,7 +140,9 @@ def test_write_xjtobi_textgrid(aps_with_times, tmp_path):
     tobi.write_xjtobi_textgrid(path, aps, phones, dur, times, f0)
 
     tg = ptg.openTextgrid(str(path), includeEmptyIntervals=False)
-    assert set(tg.tierNames) == {"segments", "tones", "words", "BI"}
+    assert set(tg.tierNames) == {"segments", "tones", "words", "words_pred", "BI"}
+    pred_labels = [e.label for e in tg.getTier("words_pred").entries]
+    assert all("/" in lab for lab in pred_labels)  # 辞書型 /N が付いている
     words = [e.label for e in tg.getTier("words").entries]
     assert "ヤマナシダ'イガク" in words
     bi_labels = [e.label for e in tg.getTier("BI").entries]
@@ -336,3 +338,80 @@ def test_peak_excl_bpm_nan_without_segments(aps_with_times):
     # BPM なしなら segments がなくても全区間で計測できる
     st2, _ = tobi.peak_excl_bpm(times, f0, [], ap, "")
     assert st2 == pytest.approx(2.0)
+
+
+def test_word_accent_rows_roundtrip(aps_with_times, tmp_path):
+    """未修正なら realized == predicted で全語 match になる。"""
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
+    times = _times_grid(0, dur)
+    f0 = np.full_like(times, 1.0)
+    path = tmp_path / "wa.TextGrid"
+    tobi.write_xjtobi_textgrid(path, aps, phones, dur, times, f0)
+
+    laps, _ = tobi.parse_xjtobi_textgrid(path)
+    rows = tobi.word_accent_rows(laps, "wa")
+    assert len(rows) == sum(len(ap.words) for ap in aps)
+    assert all(r["accent_match"] == "match" for r in rows)
+    assert all(r["realized_accent"] == r["predicted_accent"] for r in rows)
+    # 山梨大学 の辞書型が取得できている(単独でも有核)
+    yama = next(r for r in rows if r["word_kana"] == "ヤマナシダイガク")
+    assert yama["lexical_accent"] is not None and yama["lexical_accent"] > 0
+    assert yama["realized_accent"] == 5
+
+
+def test_word_accent_rows_detects_edits(aps_with_times, tmp_path):
+    """核の削除・移動・追加が deleted / shifted / inserted になる。"""
+    from praatio import textgrid as ptg
+
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
+    times = _times_grid(0, dur)
+    f0 = np.full_like(times, 1.0)
+    path = tmp_path / "we.TextGrid"
+    tobi.write_xjtobi_textgrid(path, aps, phones, dur, times, f0)
+
+    # words 層だけ手修正した状態を作る(words_pred はそのまま)
+    tg = ptg.openTextgrid(str(path), includeEmptyIntervals=False)
+    entries = [(e.start, e.end, e.label) for e in tg.getTier("words").entries]
+    edited = []
+    for s, e, lab in entries:
+        if lab == "ワ'":
+            lab = "ワ"                      # 核の削除
+        elif lab == "ヤマナシダ'イガク":
+            lab = "ヤマナ'シダイガク"        # 核の移動 5→3
+        elif lab == "デ":
+            lab = "デ'"                      # 核の追加
+        edited.append((s, e, lab))
+    tg.replaceTier("words", ptg.IntervalTier("words", edited, 0, tg.maxTimestamp))
+    tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)
+
+    laps, _ = tobi.parse_xjtobi_textgrid(path)
+    rows = {r["word_kana"]: r for r in tobi.word_accent_rows(laps, "we")}
+    assert rows["ワ"]["accent_match"] == "deleted"
+    assert rows["ヤマナシダイガク"]["accent_match"] == "shifted"
+    assert rows["ヤマナシダイガク"]["realized_accent"] == 3
+    assert rows["デ"]["accent_match"] == "inserted"
+
+
+def test_write_accent_textgrid(aps_with_times, tmp_path):
+    from praatio import textgrid as ptg
+
+    aps = aps_with_times
+    dur = aps[-1].t_end + 0.5
+    phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
+    times = _times_grid(0, dur)
+    f0 = np.full_like(times, 1.0)
+    src = tmp_path / "a.TextGrid"
+    tobi.write_xjtobi_textgrid(src, aps, phones, dur, times, f0)
+    laps, _ = tobi.parse_xjtobi_textgrid(src)
+
+    out = tmp_path / "a_accent.TextGrid"
+    tobi.write_accent_textgrid(out, laps)
+    tg = ptg.openTextgrid(str(out), includeEmptyIntervals=False)
+    assert set(tg.tierNames) == {"words", "accent_est"}
+    acc = [e.label for e in tg.getTier("accent_est").entries]
+    assert "5" in acc  # ヤマナシダ'イガク
+    assert all(a.isdigit() for a in acc)

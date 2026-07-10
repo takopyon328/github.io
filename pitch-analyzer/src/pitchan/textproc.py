@@ -11,6 +11,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 import pyopenjtalk
 
@@ -177,6 +178,21 @@ def _read_text_file(path: str) -> str:
 
 
 _SENTENCE_END_RE = re.compile(r"(?<=[。!?!?])")
+
+
+@lru_cache(maxsize=4096)
+def lexical_accent(surface: str) -> int | None:
+    """語を単独で解析したときのアクセント型(辞書型)を返す。
+
+    複数のアクセント句に分かれる語や解析不能な語は None。
+    """
+    try:
+        aps = analyze_text(surface)
+    except Exception:
+        return None
+    if len(aps) != 1:
+        return None
+    return aps[0].accent_type
 
 
 def analyze_text_file(path: str) -> list[AccentPhrase]:

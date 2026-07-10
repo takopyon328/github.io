@@ -398,10 +398,29 @@ def run_xjtobi_measure(args) -> None:
     )
     df = pd.DataFrame(rows)
     args.out.mkdir(parents=True, exist_ok=True)
+    enc = "utf-8-sig" if args.bom else "utf-8"
     out_path = args.out / f"{args.wav.stem}_xjtobi_measures.csv"
-    df.to_csv(
-        out_path, index=False, encoding="utf-8-sig" if args.bom else "utf-8"
+    df.to_csv(out_path, index=False, encoding=enc)
+
+    # 単語レベルの実現アクセント型と予測・辞書型の対照
+    word_rows = tobi.word_accent_rows(laps, args.wav.stem)
+    words_path = args.out / f"{args.wav.stem}_xjtobi_words.csv"
+    pd.DataFrame(word_rows).to_csv(words_path, index=False, encoding=enc)
+    tobi.write_accent_textgrid(
+        args.out / f"{args.wav.stem}_accent.TextGrid", laps
     )
+    if word_rows and "accent_match" in word_rows[0]:
+        n_mismatch = sum(1 for r in word_rows if r["accent_match"] != "match")
+        logger.info(
+            "単語アクセント対照: %d 語中 %d 語が予測と不一致 (%s)",
+            len(word_rows), n_mismatch, words_path.name,
+        )
+    else:
+        logger.info(
+            "words_pred 層がないため予測との対照は出力されません"
+            "(実現型のみ %s に出力)", words_path.name,
+        )
+
     n_bpm = sum(1 for r in rows if r["bpm"])
     logger.info(
         "完了: %s (%d AP, 有核 %d, BPM %d, ref=%.1f Hz)",
