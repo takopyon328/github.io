@@ -12,7 +12,9 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from . import align, f0 as f0mod, normalize, outputs, segment, split, textproc, tobi
+from . import (
+    align, f0 as f0mod, normalize, outputs, refine, segment, split, textproc, tobi,
+)
 
 logger = logging.getLogger("pitchan")
 
@@ -34,15 +36,20 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "xjtobi-measure":
             run_xjtobi_measure(args)
-            return 0
-        if args.command == "analyze":
+        elif args.command == "refine":
+            run_refine_command(args)
+        elif args.command == "analyze":
             pairs = [Pair(args.speaker, args.wav.stem, args.wav, args.text)]
-        else:
+            run_pipeline(pairs, args)
+        elif args.command == "batch":
             pairs = _collect_pairs(args.dir, args.speaker, args.out)
             if not pairs:
                 logger.error("%s に .wav/.txt ペアが見つかりません", args.dir)
                 return 1
-        run_pipeline(pairs, args)
+            run_pipeline(pairs, args)
+        else:  # サブコマンドは required=True のため通常は到達しない
+            logger.error("不明なコマンド: %s", args.command)
+            return 1
         return 0
     except (align.AlignmentError, ValueError, FileNotFoundError) as e:
         logger.error("%s", e)
@@ -87,6 +94,36 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_me.add_argument("--bom", action="store_true")
 
+    p_re = sub.add_parser(
+        "refine",
+        help="既存 TextGrid を初期値として音声から局所的に再アラインメントする",
+    )
+    p_re.add_argument("--wav", type=Path, required=True)
+    p_re.add_argument("--text", type=Path, required=True, help="朗読テキスト")
+    p_re.add_argument("--textgrid", type=Path, required=True,
+                      help="pitchan が生成した <name>.TextGrid(上書きされない)")
+    p_re.add_argument("--out", type=Path, required=True, help="出力ディレクトリ")
+    p_re.add_argument("--speaker", default="spk", help="話者 ID(既定 spk)")
+    p_re.add_argument("--core-words", type=int, default=5,
+                      help="1 block の採用対象語数(既定 5)")
+    p_re.add_argument("--context-words", type=int, default=2,
+                      help="block 前後の文脈語数(既定 2)")
+    p_re.add_argument("--margin-sec", type=float, default=0.30,
+                      help="音声切り出しの前後マージン [s](既定 0.30)")
+    p_re.add_argument("--auto-accept-shift-ms", type=float, default=80.0,
+                      help="自動採用する最大移動量 [ms](既定 80。暫定値)")
+    p_re.add_argument("--hard-max-shift-ms", type=float, default=250.0,
+                      help="これを超える移動は棄却 [ms](既定 250。暫定値)")
+    p_re.add_argument("--apply-review", action="store_true",
+                      help="REVIEW 判定の候補も適用する(status は REVIEW のまま)")
+    p_re.add_argument("--fine-tune-boundary-tolerance", type=float, default=None,
+                      help="MFA --fine_tune_boundary_tolerance に渡す値")
+    p_re.add_argument("--jobs", type=int, default=4)
+    p_re.add_argument("--beam", type=int, default=100)
+    p_re.add_argument("--retry-beam", type=int, default=400)
+    p_re.add_argument("--acoustic-model", default="japanese_mfa")
+    p_re.add_argument("--g2p-model", default="japanese_mfa")
+
     for p in (p_an, p_ba):
         p.add_argument("--out", type=Path, required=True, help="出力ディレクトリ")
         p.add_argument("--speaker", default="spk", help="話者 ID(既定 spk)")
@@ -122,6 +159,11 @@ def _build_parser() -> argparse.ArgumentParser:
                        help="並列数(F0 抽出・MFA)")
         p.add_argument("--beam", type=int, default=100)
         p.add_argument("--retry-beam", type=int, default=400)
+        p.add_argument("--fine-tune-alignment", action="store_true",
+                       help="MFA の境界微調整 (--fine_tune) を有効にする")
+        p.add_argument("--fine-tune-boundary-tolerance", type=float, default=None,
+                       help="MFA --fine_tune_boundary_tolerance に渡す値"
+                            "(指定時は --fine-tune-alignment も有効になる)")
         p.add_argument("--acoustic-model", default="japanese_mfa")
         p.add_argument("--g2p-model", default="japanese_mfa")
     return parser
@@ -204,10 +246,17 @@ def run_pipeline(pairs: list[Pair], args) -> None:
     logger.info("発音辞書を生成中 (mfa g2p)...")
     dict_path = align.build_g2p_dictionary(items, work_dir, args.g2p_model)
     logger.info("アラインメント中 (mfa align)... 長尺ファイルでは時間がかかります")
+    fine_tune = getattr(args, "fine_tune_alignment", False) or (
+        getattr(args, "fine_tune_boundary_tolerance", None) is not None
+    )
     align.run_align(
         corpus_dir, dict_path, aligned_dir,
         acoustic_model=args.acoustic_model,
         beam=args.beam, retry_beam=args.retry_beam, num_jobs=args.jobs,
+        fine_tune=fine_tune,
+        fine_tune_boundary_tolerance=getattr(
+            args, "fine_tune_boundary_tolerance", None
+        ),
     )
     all_phones: dict[str, list] = {}
     for pr in pairs:
@@ -363,6 +412,29 @@ def _collect_split_alignment(
             pr.name, n_failed, len(utts),
         )
     return phones_all
+
+
+def run_refine_command(args) -> None:
+    """pitchan refine のエントリポイント(処理本体は refine モジュール)。"""
+    refine.run_refine(
+        wav_path=args.wav,
+        text_path=args.text,
+        textgrid_path=args.textgrid,
+        out_dir=args.out,
+        speaker=args.speaker,
+        core_words=args.core_words,
+        context_words=args.context_words,
+        margin_sec=args.margin_sec,
+        auto_accept_shift_ms=args.auto_accept_shift_ms,
+        hard_max_shift_ms=args.hard_max_shift_ms,
+        apply_review=args.apply_review,
+        fine_tune_boundary_tolerance=args.fine_tune_boundary_tolerance,
+        jobs=args.jobs,
+        beam=args.beam,
+        retry_beam=args.retry_beam,
+        acoustic_model=args.acoustic_model,
+        g2p_model=args.g2p_model,
+    )
 
 
 def run_xjtobi_measure(args) -> None:

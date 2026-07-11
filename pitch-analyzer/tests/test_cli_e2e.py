@@ -1,9 +1,9 @@
-"""偽 mfa コマンドを使った CLI の end-to-end テスト。"""
+"""偽 mfa コマンドを使った CLI の end-to-end テスト。
 
-import os
+fake_mfa_on_path フィクスチャは conftest.py で定義されている。
+"""
+
 import shutil
-import stat
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -14,20 +14,6 @@ import pytest
 from pitchan.cli import main
 
 TEXT = "私は山梨大学で、音声を研究しています。"
-
-
-@pytest.fixture
-def fake_mfa_on_path(tmp_path, monkeypatch):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    src = Path(__file__).parent / "fake_mfa.py"
-    dst = bin_dir / "mfa"
-    dst.write_text(
-        f"#!{sys.executable}\n" + src.read_text(encoding="utf-8").split("\n", 1)[1],
-        encoding="utf-8",
-    )
-    dst.chmod(dst.stat().st_mode | stat.S_IEXEC)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 
 
 def _make_wav(path: Path, duration: float, f0_hz: float = 150.0, sr: int = 16000):

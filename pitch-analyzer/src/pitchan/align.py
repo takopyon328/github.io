@@ -94,21 +94,30 @@ def run_align(
     beam: int = 100,
     retry_beam: int = 400,
     num_jobs: int = 4,
+    fine_tune: bool = False,
+    fine_tune_boundary_tolerance: float | None = None,
 ) -> None:
-    """mfa align を実行する。out_dir に speaker/name.TextGrid が生成される。"""
+    """mfa align を実行する。out_dir に speaker/name.TextGrid が生成される。
+
+    fine_tune=True で MFA の境界微調整(--fine_tune)を有効にする。
+    fine_tune_boundary_tolerance は指定時のみ渡す。
+    """
     if out_dir.exists():
         shutil.rmtree(out_dir)
     # MFA(click)は --beam 等の追加設定オプションを位置引数の後に置く必要がある
     # (前に置くと値がコーパスパスとして解釈される)
-    _run_mfa_command(
-        [
-            "mfa", "align",
-            str(corpus_dir), str(dict_path), acoustic_model, str(out_dir),
-            "--clean", "--overwrite",
-            "--beam", str(beam), "--retry_beam", str(retry_beam),
-            "--num_jobs", str(num_jobs),
-        ]
-    )
+    cmd = [
+        "mfa", "align",
+        str(corpus_dir), str(dict_path), acoustic_model, str(out_dir),
+        "--clean", "--overwrite",
+        "--beam", str(beam), "--retry_beam", str(retry_beam),
+        "--num_jobs", str(num_jobs),
+    ]
+    if fine_tune:
+        cmd.append("--fine_tune")
+    if fine_tune_boundary_tolerance is not None:
+        cmd += ["--fine_tune_boundary_tolerance", str(fine_tune_boundary_tolerance)]
+    _run_mfa_command(cmd)
 
 
 def _run_mfa_command(cmd: list[str]) -> None:

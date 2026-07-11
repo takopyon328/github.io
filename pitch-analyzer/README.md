@@ -68,6 +68,8 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 | `--xjtobi` | off | 簡易版 X-JToBI(五十嵐 2015)準拠の TextGrid 下書きを `<name>_xjtobi.TextGrid` に出力 |
 | `--bom` | off | CSV を BOM 付き UTF-8 で出力(Excel で開く場合) |
 | `--jobs` | 4 | 並列数(F0 抽出と MFA に適用) |
+| `--fine-tune-alignment` | off | MFA の境界微調整(`--fine_tune`)を有効化。音素・単語境界を 10ms 刻みの通常出力より細かく(1ms 刻みで)推定し直す。**1ms 刻みの出力は 1ms の正確さを保証しない**点に注意 |
+| `--fine-tune-boundary-tolerance` | なし | MFA `--fine_tune_boundary_tolerance` に渡す値。指定すると `--fine-tune-alignment` も有効として扱う |
 
 ## 出力ファイル
 
@@ -84,6 +86,46 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 
 `results/work/` に MFA の中間ファイル(コーパス・生成辞書・アラインメント結果)が
 残るので、アラインメントの検証に使えます。
+
+## 局所再アラインメント(`refine`)
+
+pitchan が生成した TextGrid を**初期値**として、対応する WAV と朗読テキストから
+単語境界を局所的に整列し直し、修正版 TextGrid を生成します。**入力 TextGrid は
+上書きしません**。
+
+```bash
+pitchan refine --wav recording.wav --text script.txt \
+    --textgrid results/recording.TextGrid --out results/refine/
+```
+
+仕組み: 単語列を core block(既定 5 語)に分け、前後 2 語の context と 0.30 秒の
+margin を付けて音声を切り出し、全 block を 1 つの一時コーパスにまとめて MFA
+(`--fine_tune` 既定 ON)で一括再アラインメントします。採否は block 単位:
+
+| status | 条件 | 動作 |
+|---|---|---|
+| `AUTO_ACCEPT` | 候補が有効かつ最大移動量 ≤ `--auto-accept-shift-ms`(既定 80) | 候補を自動採用 |
+| `REVIEW` | 有効だが移動量が 80〜`--hard-max-shift-ms`(既定 250) | 既定では元の境界を維持し候補を CSV に保存。`--apply-review` 指定時のみ適用(status は REVIEW のまま) |
+| `KEEP_ORIGINAL` | MFA 失敗・ラベル不一致・時刻の逆転/重複/範囲外・hard max 超過・統合検証失敗 | 元の境界を維持 |
+
+出力(`<stem>_` は入力 TextGrid 名):
+
+- `<stem>_refined.TextGrid` — tier: `accent_phrases` / `words` / `phones`(構築可能な場合)
+  + `*_original`(入力の保存)+ `alignment_review`(AUTO_ACCEPT 以外の block の
+  status・移動量・理由。例 `REVIEW|block=12|max_shift_ms=137.4|reason=large_shift`)
+- `<stem>_alignment_diff.csv` — 1 語 1 行。修正前後の時刻・候補・採否・理由
+- `<stem>_refine_summary.json` — 実行オプション・件数・移動量の中央値/90 パーセンタイル・警告
+- `work/refine/` — MFA の中間ファイル
+
+注意:
+
+- **テキストと発話内容が一致している朗読音声が前提**です。読み飛ばし・言い直し・
+  語の挿入や置換の自動処理(音声認識による補正)は対象外で、その場合は明確な
+  エラーまたは KEEP_ORIGINAL になります。
+- 閾値(80ms / 250ms / margin 0.30s など)は**暫定値**です。手修正済みデータと
+  突き合わせて較正した上で本採用してください。
+- MFA の fine-tune は境界を 1ms 刻みで出力しますが、**1ms の正確さを保証する
+  ものではありません**。
 
 ## 簡易版 X-JToBI 出力(`--xjtobi`)
 

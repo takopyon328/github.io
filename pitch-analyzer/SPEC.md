@@ -158,6 +158,29 @@ pitchan analyze --wav recording.wav --from-textgrid fixed.TextGrid --out results
   メディアンフィルタ(5点)を提供。
 - 複数話者が混在する音声、歌唱、自発音声(フィラー・言い淀み多数)は対象外。
 
+## 7.4 既存 TextGrid を初期値とする局所再アラインメント(`refine`、追加機能)
+
+通常の `analyze`/`batch` が「テキスト+音声から新規にアラインメントする」のに
+対し、`refine` は「既存の pitchan 出力 TextGrid の単語時刻を初期値として、
+局所的に境界を整列し直す」。
+
+1. 入力検証: words tier(完全一致優先で探索)のラベル列がテキスト解析の読み列と
+   完全一致すること、時刻の健全性、WAV 長との整合を検査(不一致は AlignmentError)
+2. 単語列を core block(既定 5 語)+context(前後 2 語)に分割し、margin
+   (既定 0.30 秒)付きで音声を切り出して 1 コーパスに集約、MFA を 1 回だけ実行
+   (`--fine_tune` 既定 ON)
+3. core 部分のみ候補として絶対時刻へ戻し、block 単位で
+   AUTO_ACCEPT(移動 ≤80ms)/ REVIEW(≤250ms、既定は元境界を維持)/
+   KEEP_ORIGINAL(失敗・矛盾・250ms 超)を判定。閾値は暫定値で CLI から変更可
+4. 統合時に隣接 block 間の重複・逆転を検査し、破綻する block は元境界へ巻き戻す
+   (機械的な按分はしない)
+5. 出力: `<stem>_refined.TextGrid`(refined + original + alignment_review 層)、
+   `<stem>_alignment_diff.csv`(1 語 1 行の修正前後・採否・理由)、
+   `<stem>_refine_summary.json`。入力は上書きしない
+
+前提: テキストと発話内容が一致した朗読音声。読み飛ばし・言い直し・語の挿入や
+置換の自動処理は対象外。
+
 ## 7.5 簡易版 X-JToBI 対応(追加機能)
 
 五十嵐(2015)の簡易版 X-JToBI の全要素に対応する。

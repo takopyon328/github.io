@@ -13,7 +13,8 @@ def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = sys.argv[1:]
     # フラグの値(--beam 100 など)を位置引数から除外する
-    valued = {"--beam", "--retry_beam", "--num_jobs"}
+    # (--fine_tune は値なしフラグなので valued に含めない)
+    valued = {"--beam", "--retry_beam", "--num_jobs", "--fine_tune_boundary_tolerance"}
     skip_next = False
     positional = []
     for a in sys.argv[1:]:
