@@ -402,3 +402,48 @@ def test_e2e_refined_textgrid_readable(tmp_path, fake_mfa_on_path):
     )
     assert [w[2] for w in words] == tokens
     assert phones  # phones tier も読める
+
+
+def test_load_input_textgrid_wav_length_mismatch(tmp_path):
+    """TextGrid の最大時刻と WAV 長が大きく異なる場合は拒否される。"""
+    txt, tg, aps, dur = _write_input_textgrid(tmp_path)
+    words = [w for ap in aps for w in ap.words]
+    with pytest.raises(align.AlignmentError, match="大きく異なります"):
+        refine.load_input_textgrid(tg, words, dur + 2.0)
+
+
+def test_integrate_reverts_on_phone_joint_overlap():
+    """単語は整合しても音素が隣接 block と重複するなら block を巻き戻す。"""
+    words = _uniform_words(10)
+    blocks = refine.build_blocks(words, 5, 0, 0.3, 100.0)
+    # block0 候補: 単語は左へ 20ms(単語 joint は無矛盾)だが、
+    # 最終音素だけが block1 の先頭音素(元位置 2.0-)へ食い込む
+    ctx0 = [(s - 0.02, e - 0.02, lab) for s, e, lab in words[0:5]]
+    phones0 = [(s, e, "p") for s, e, _ in ctx0[:-1]] + [(1.9, 2.05, "p")]
+    r0 = refine.evaluate_block(blocks[0], ctx0, phones0, words, 100.0, 80.0, 250.0)
+    assert r0.status == RefinementStatus.AUTO_ACCEPT
+    assert any(e > 2.0 for _, e, _ in r0.cand_phones)
+    r1 = refine.keep_original_result(blocks[1], words, "mfa_failed")
+    orig_phones = [(s, e, "p") for s, e, _ in words]  # 入力の phones tier
+    applied, phones, warnings = refine.integrate_blocks(
+        [r0, r1], words, orig_phones, apply_review=False
+    )
+    assert r0.status == RefinementStatus.KEEP_ORIGINAL
+    assert "integration_overlap" in r0.reason
+    assert applied[0][0] == pytest.approx(words[0][0])  # 元の境界に戻る
+    assert phones is not None  # 全 block 元のままなので入力 phones で一貫
+
+
+def test_integrate_warns_on_artificial_joint_gap():
+    """採用 block と維持 block の継ぎ目に元より広い隙間が生じたら警告する。"""
+    words = _uniform_words(10)  # 元は隙間なしで連続
+    blocks = refine.build_blocks(words, 5, 0, 0.3, 100.0)
+    ctx0 = [(s - 0.05, e - 0.05, lab) for s, e, lab in words[0:5]]  # 左へ 50ms
+    r0 = refine.evaluate_block(blocks[0], ctx0, [], words, 100.0, 80.0, 250.0)
+    r1 = refine.keep_original_result(blocks[1], words, "mfa_failed")
+    applied, _, warnings = refine.integrate_blocks(
+        [r0, r1], words, [], apply_review=False
+    )
+    assert r0.status == RefinementStatus.AUTO_ACCEPT  # 隙間は巻き戻さない
+    assert applied[4][1] == pytest.approx(words[4][1] - 0.05)
+    assert any("隙間" in w for w in warnings)

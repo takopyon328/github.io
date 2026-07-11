@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 _EPS = 1e-4  # 時刻比較の許容誤差 [s]
 MAX_TG_WAV_MISMATCH_SEC = 1.0  # TextGrid 最大時刻と WAV 長のずれの許容量
+JOINT_GAP_WARN_SEC = 0.02  # block 継ぎ目の隙間が元よりこれ以上広がったら警告
 
 
 class RefinementStatus(str, Enum):
@@ -327,6 +328,19 @@ def integrate_blocks(
                 wc.applied_start, wc.applied_end = wc.old_start, wc.old_end
         warnings.append("統合検証に失敗したため全 block を元の境界に戻しました")
 
+    # 継ぎ目の人工的な隙間の検出(重複と違い巻き戻しはしないが、要確認として記録)
+    for prev, nxt in zip(results, results[1:]):
+        if not prev.candidates or not nxt.candidates:
+            continue
+        orig_gap = nxt.candidates[0].old_start - prev.candidates[-1].old_end
+        new_gap = nxt.candidates[0].applied_start - prev.candidates[-1].applied_end
+        if new_gap > orig_gap + JOINT_GAP_WARN_SEC:
+            warnings.append(
+                f"block {prev.block.index}-{nxt.block.index} の継ぎ目に元より "
+                f"{(new_gap - orig_gap) * 1000:.0f} ms 広い隙間が生じています"
+                "(採否が block 単位のため。Praat で要確認)"
+            )
+
     applied_words = [
         (wc.applied_start, wc.applied_end, orig_words[wc.word_index][2])
         for r in results
@@ -482,16 +496,19 @@ def run_refine(
     results: list[BlockResult] = []
     for b, item in zip(blocks, items):
         tg_path = aligned_dir / speaker / f"{item.name}.TextGrid"
+        if not tg_path.exists():
+            logger.warning(
+                "block %d: TextGrid が生成されていません (mfa_failed)", b.index
+            )
+            results.append(keep_original_result(b, orig_words, "mfa_failed"))
+            continue
         try:
-            if not tg_path.exists():
-                raise align.AlignmentError("TextGrid が生成されていません (mfa_failed)")
             local_words, local_phones = align.read_word_intervals(
                 tg_path, item.tokens
             )
         except align.AlignmentError as e:
-            reason = "mfa_failed" if "生成されていません" in str(e) else "label_mismatch"
-            logger.warning("block %d: %s (%s)", b.index, reason, e)
-            results.append(keep_original_result(b, orig_words, reason))
+            logger.warning("block %d: label_mismatch (%s)", b.index, e)
+            results.append(keep_original_result(b, orig_words, "label_mismatch"))
             continue
         off = b.slice_t0
         results.append(
