@@ -1,0 +1,10 @@
+{
+  "name": "school-notice-reminders",
+  "private": true,
+  "type": "module",
+  "description": "学校のおたより写真から提出物・イベントを抽出して前日にリマインドするシステム",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "sharp": "^0.33.0"
+  }
+}

@@ -1,0 +1,20 @@
+name: 📄 おたよりアップロード
+description: 学校のおたよりの写真を登録します。数分後に読み取り結果がコメントされ、前日リマインドに登録されます。
+title: "おたより登録"
+labels: ["おたより"]
+body:
+  - type: textarea
+    id: photos
+    attributes:
+      label: おたよりの写真
+      description: ここをタップして写真を添付してください（複数枚OK）。文字がはっきり写るように撮影すると読み取り精度が上がります。
+      placeholder: ここに写真を貼り付け・添付してください
+    validations:
+      required: true
+  - type: textarea
+    id: memo
+    attributes:
+      label: メモ（任意）
+      description: 補足があれば書いてください（例:「2ページ目は関係ない」「上の子のクラスのおたより」など）
+    validations:
+      required: false

@@ -1,0 +1,53 @@
+name: おたより処理
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  models: read
+
+concurrency:
+  group: reminders-data
+  cancel-in-progress: false
+
+jobs:
+  process:
+    # 「おたより」ラベル、またはタイトルに「おたより」を含む Issue のみ処理する
+    if: contains(github.event.issue.labels.*.name, 'おたより') || contains(github.event.issue.title, 'おたより')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 依存パッケージをインストール
+        working-directory: reminders
+        run: npm install --no-audit --no-fund
+
+      - name: おたよりから予定を抽出
+        run: node reminders/scripts/process-notice.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: 予定データをコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reminders/events.json
+          if ! git diff --cached --quiet; then
+            git commit -m "おたより #${{ github.event.issue.number }} の予定を登録"
+            git pull --rebase origin "${{ github.ref_name }}" || true
+            git push
+          fi
