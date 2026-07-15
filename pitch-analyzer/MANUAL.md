@@ -133,14 +133,12 @@ onsei\
 
 ## 4. 基本の分析(batch)
 
-7 名分をまとめて分析する標準的なコマンド:
+7 名分をまとめて分析する標準的なコマンド(**1 行で入力**する。行継続 `^` は
+貼り付け時に `More?` プロンプトと混ざって失敗しやすいため使わない):
 
 ```
-pitchan batch --dir C:\Users\nunom\onsei --out C:\Users\nunom\onsei\results ^
-    --ref file --split-sentences --adaptive-range --plot-ap --xjtobi --bom
+pitchan batch --dir C:\Users\nunom\onsei --out C:\Users\nunom\onsei\results --ref file --split-sentences --adaptive-range --plot-ap --xjtobi --bom
 ```
-
-(`^` は Anaconda Prompt での行継続。1 行で書いても同じ)
 
 推奨オプションの意味:
 
