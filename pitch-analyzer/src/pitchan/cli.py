@@ -401,6 +401,21 @@ def _collect_split_alignment(
                 pr.name, u.index, u.aps[0].kana[:12], e,
             )
             continue
+        # 誤ったチャンクへの強制整列の検出: 語区間の合計から見たモーラあたり
+        # 時間が不自然な発話は「成功」として通さない
+        u_moras = sum(ap.mora_count for ap in u.aps)
+        u_speech = sum(e - s for s, e, _ in words)
+        per_mora = u_speech / max(u_moras, 1)
+        if not (segment.MIN_SEC_PER_MORA <= per_mora <= segment.MAX_SEC_PER_MORA):
+            n_failed += 1
+            for ap in u.aps:
+                ap.low_confidence = True
+            logger.warning(
+                "%s: 発話 %d (%s…) の整列結果が不自然(モーラあたり %.0f ms)な"
+                "ためスキップ(テキストと音声の対応を確認してください)",
+                pr.name, u.index, u.aps[0].kana[:12], per_mora * 1000,
+            )
+            continue
         offset = u.t_start
         segment.assign_times(
             u.aps, [(s + offset, e + offset, lab) for s, e, lab in words]

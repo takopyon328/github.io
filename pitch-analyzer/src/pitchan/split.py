@@ -17,8 +17,11 @@ from .textproc import AccentPhrase
 
 logger = logging.getLogger(__name__)
 
-MIN_PAUSE_SEC = 0.30  # これ以上の無音を文境界の候補とする
-BOUNDARY_TOL_SEC = 3.0  # 予測境界と無音候補の対応付けを許す最大のずれ
+MIN_PAUSE_SEC = 0.30  # 無音区間として検出する最小長
+BOUNDARY_MIN_PAUSE_SEC = 0.40  # 文境界の候補とする無音の最小長(読点ポーズを除外)
+BOUNDARY_TOL_SEC = 1.5  # 予測境界と無音候補の対応付けを許す最大のずれ(発話時間座標)
+MIN_SEC_PER_MORA_PLAN = 0.05  # 分割計画の妥当性検査(発話部分のモーラあたり時間)
+MAX_SEC_PER_MORA_PLAN = 0.40
 _FRAME_MS = 10.0
 
 
@@ -71,60 +74,66 @@ def plan_utterances(
 ) -> list[Utterance]:
     """文境界を無音候補に対応付け、発話区間のリストを返す。
 
-    予測境界時刻(累積モーラ数に比例)と無音候補の中央時刻を、順序を保った
-    動的計画法で対応付ける。対応する無音がない文境界は分割せず前後の文を
-    同一発話にまとめる(ポーズなしで読み継がれた文)。
+    対応付けは**発話時間座標**(それまでの無音を除いた累積時間)で行う。
+    ポーズの長さ・分布が予測位置を歪めないため、実時間での比例配分より頑健。
+    予測は境界を 1 つ確定するごとに残り区間で再計算する(再アンカー)ので、
+    読速の変動による累積ずれも自己補正される。
+
+    候補は BOUNDARY_MIN_PAUSE_SEC 以上の無音に限定し(読点ポーズを除外)、
+    許容幅 tol 内に候補がない文境界は分割せず前後の文を同一発話にまとめる。
+    分割計画がモーラあたり時間として不自然な場合は、誤った切り出しで黙って
+    ずれるより安全なファイル全体(1 発話)へフォールバックする。
     """
-    # 文ごとの AP と モーラ数
     sents: dict[int, list[AccentPhrase]] = {}
     for ap in aps:
         sents.setdefault(ap.sentence_index, []).append(ap)
     order = sorted(sents)
     moras = np.array([sum(a.mora_count for a in sents[s]) for s in order], float)
     m = len(order)
+    whole = [Utterance(0, 0.0, total_dur, list(aps))]
     if m <= 1 or not silences:
-        return [Utterance(0, 0.0, total_dur, list(aps))]
+        return whole
 
-    # 文境界(m-1 個)の予測時刻
-    k = total_dur / max(moras.sum(), 1.0)
-    expected = np.cumsum(moras)[:-1] * k
-    # 無音候補の中央時刻(ファイル端に近すぎるものは除外)
+    sil = sorted(silences)
+
+    def speech_time(t: float) -> float:
+        """時刻 t までの発話時間(無音を除いた累積時間)。"""
+        return t - sum(max(0.0, min(e, t) - s) for s, e in sil)
+
+    total_speech = speech_time(total_dur)
+    total_moras = float(moras.sum())
+    if total_speech <= 0 or total_moras <= 0:
+        return whole
+    cum = np.cumsum(moras)
+
+    # 文境界の候補: 十分長い無音の中央(ファイル端は除外)。発話時間座標も持つ
     cands = [
-        (s0 + s1) / 2 for s0, s1 in silences if 0.2 < (s0 + s1) / 2 < total_dur - 0.2
+        ((s0 + s1) / 2, speech_time((s0 + s1) / 2))
+        for s0, s1 in sil
+        if (s1 - s0) >= BOUNDARY_MIN_PAUSE_SEC
+        and 0.2 < (s0 + s1) / 2 < total_dur - 0.2
     ]
 
-    # DP による順序保存の対応付け。dp[i][j] = 境界 i 個・候補 j 個まで見た最小コスト。
-    # 境界を割り当てない(分割しない)ペナルティ = tol。
-    B, n = m - 1, len(cands)
-    INF = float("inf")
-    SKIP_B, SKIP_C, MATCH = 0, 1, 2
-    dp = np.full((B + 1, n + 1), INF)
-    move = np.full((B + 1, n + 1), -1, int)
-    dp[0, :] = 0.0
-    move[0, 1:] = SKIP_C
-    for i in range(1, B + 1):
-        for j in range(n + 1):
-            best, mv = dp[i - 1, j] + tol, SKIP_B  # 境界 i をスキップ
-            if j >= 1 and dp[i, j - 1] < best:  # 候補 j を使わない
-                best, mv = dp[i, j - 1], SKIP_C
-            if j >= 1:
-                cost = abs(cands[j - 1] - expected[i - 1])
-                if cost <= tol and dp[i - 1, j - 1] + cost < best:
-                    best, mv = dp[i - 1, j - 1] + cost, MATCH
-            dp[i, j], move[i, j] = best, mv
-
-    assigned: dict[int, float] = {}  # 境界 index (0..B-1) -> 時刻
-    i, j = B, n
-    while i > 0 or j > 0:
-        mv = move[i, j]
-        if mv == MATCH:
-            assigned[i - 1] = cands[j - 1]
-            i, j = i - 1, j - 1
-        elif mv == SKIP_B:
-            i -= 1
-        else:
-            j -= 1
-    n_skipped = B - len(assigned)
+    # 逐次・再アンカー方式の対応付け(発話時間座標)
+    assigned: dict[int, float] = {}  # 文境界 index -> 絶対時刻
+    prev_st = 0.0
+    prev_moras = 0.0
+    ci = 0
+    for i in range(m - 1):
+        k_local = (total_speech - prev_st) / max(total_moras - prev_moras, 1.0)
+        expected_st = prev_st + (cum[i] - prev_moras) * k_local
+        best_j, best_cost = None, tol
+        for j in range(ci, len(cands)):
+            cost = abs(cands[j][1] - expected_st)
+            if cost <= best_cost:
+                best_j, best_cost = j, cost
+        if best_j is None:
+            continue  # 対応する無音なし → 前後の文を同一発話に
+        assigned[i] = cands[best_j][0]
+        prev_st = cands[best_j][1]
+        prev_moras = float(cum[i])
+        ci = best_j + 1
+    n_skipped = (m - 1) - len(assigned)
     if n_skipped:
         logger.info(
             "%d 個の文境界に対応する無音が見つからず、前後の文を同一発話に"
@@ -135,11 +144,27 @@ def plan_utterances(
     utts: list[Utterance] = []
     cur: list[AccentPhrase] = []
     t0 = 0.0
-    for si, s in enumerate(order):
-        cur.extend(sents[s])
+    for si in range(m):
+        cur.extend(sents[order[si]])
         if si in assigned or si == m - 1:
             t1 = assigned.get(si, total_dur)
             utts.append(Utterance(len(utts), t0, t1, cur))
             t0 = t1
             cur = []
+
+    # 分割計画の妥当性検査: 各発話の発話部分のモーラあたり時間が現実的な範囲か。
+    # 不自然な場合は誤った境界に強制整列するより 1 発話(従来方式)へ戻す
+    if len(utts) > 1:
+        for u in utts:
+            u_moras = sum(ap.mora_count for ap in u.aps)
+            u_speech = speech_time(u.t_end) - speech_time(u.t_start)
+            per_mora = u_speech / max(u_moras, 1)
+            if not (MIN_SEC_PER_MORA_PLAN <= per_mora <= MAX_SEC_PER_MORA_PLAN):
+                logger.warning(
+                    "発話 %d のモーラあたり時間が %.0f ms と不自然なため、"
+                    "文単位分割を中止してファイル全体を 1 発話として扱います"
+                    "(文境界と無音の対応付けに失敗した可能性)",
+                    u.index, per_mora * 1000,
+                )
+                return whole
     return utts

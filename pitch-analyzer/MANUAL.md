@@ -137,7 +137,7 @@ onsei\
 貼り付け時に `More?` プロンプトと混ざって失敗しやすいため使わない):
 
 ```
-pitchan batch --dir C:\Users\nunom\onsei --out C:\Users\nunom\onsei\results --ref file --split-sentences --adaptive-range --plot-ap --xjtobi --bom
+pitchan batch --dir C:\Users\nunom\onsei --out C:\Users\nunom\onsei\results --ref file --adaptive-range --plot-ap --xjtobi --bom
 ```
 
 推奨オプションの意味:
@@ -145,11 +145,16 @@ pitchan batch --dir C:\Users\nunom\onsei --out C:\Users\nunom\onsei\results --re
 | オプション | 推奨理由 |
 |---|---|
 | `--ref file` | 1 話者 1 ファイル構成での話者別正規化(§3) |
-| `--split-sentences` | 文単位でアラインメント。言い淀み等の不一致があっても失敗がその文に閉じ、長尺でも安定 |
 | `--adaptive-range` | 話者ごとに F0 探索範囲を自動推定(男女混在データで倍・半ピッチ誤りが減る) |
 | `--plot-ap` | 句ごとの F0 図(§5) |
 | `--xjtobi` | 簡易版 X-JToBI 下書き(§7) |
 | `--bom` | CSV を Excel で文字化けなく開ける形式に |
+
+`--split-sentences`(文単位分割)は**アラインメントに失敗したファイルだけ**に
+対する再実行手段として使ってください。文境界と無音の対応付けに失敗すると
+境界が大きくずれる可能性があるため、既定では付けず、使った場合は必ず
+TextGrid を Praat で開いて音声と照合してください(ずれた発話には
+low_confidence が付き、ログに警告が出ます)。
 
 単一ファイルなら `pitchan analyze --wav X.wav --text X.txt --out results\ ...`。
 
@@ -293,9 +298,14 @@ pitchan refine --wav X.wav --text X.txt --textgrid results\X.TextGrid --out resu
 不一致。同名にする。
 
 **`NoAlignmentsError`(アラインメント失敗)** — テキストと発話の不一致が原因の
-ことが多い。対処の順番: (1) `--split-sentences` を付ける(失敗が文単位に閉じる)、
-(2) 言い淀み箇所のテキストを発話どおりに逐語化する、(3) それでもだめなら
-`--beam 1000 --retry-beam 4000`。
+ことが多い。対処の順番: (1) 言い淀み箇所のテキストを発話どおりに逐語化する、
+(2) `--beam 1000 --retry-beam 4000` で再実行、(3) それでもだめなら該当ファイル
+だけ `--split-sentences` を付けて再実行し、結果を必ず Praat で照合する。
+
+**TextGrid の語と音声がずれている** — `--split-sentences` を使った場合は
+文境界と無音の対応付けの失敗が疑われる。まず `--split-sentences` なしで
+実行し直す(既定の方式が最も信頼できる)。ずれた発話は low_confidence=1 と
+警告で通知されるので、`ap_summary.csv` とログを確認する。
 
 **一部のファイルだけ TextGrid が生成されない** — そのファイルにテキストとの
 不一致がある。ログの `N/M 発話が失敗` と該当句の `low_confidence` を確認。
