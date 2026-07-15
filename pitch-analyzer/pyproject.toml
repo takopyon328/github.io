@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pitchan"
+version = "0.1.0"
+description = "日本語朗読音声のアクセント句単位ピッチ(F0)分析ツール"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "soundfile",
+    "pyworld",
+    "pyopenjtalk-plus",
+    "praatio>=6.0",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+dev = ["pytest"]
+
+[project.scripts]
+pitchan = "pitchan.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
