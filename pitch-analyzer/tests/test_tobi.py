@@ -43,14 +43,30 @@ def test_nucleus_unaccented():
 def test_bi_points(aps_with_times):
     aps = aps_with_times
     points = dict(tobi.bi_points(aps))
-    # AP 内部の語境界は 1
-    assert points[aps[0].words[0].t_end] == "1"
+    # この文では各 AP が 1 文節なので、AP 内部の境界(BI=1)は付かない
+    # (私+は は 1 文節。語境界は BI の対象にしない)
+    assert "1" not in points.values()
     # ポーズなしで隣接する AP 境界は 2
     assert points[aps[0].t_end] == "2"
     # 0.5 秒のポーズを挟む境界は 3
     assert points[aps[1].t_end] == "3"
     # 発話末は 3
     assert points[aps[-1].t_end] == "3"
+
+
+def test_bi_points_bunsetsu_internal_boundary():
+    """AP 内に複数文節がある場合、文節境界に BI=1 が付く。"""
+    from pitchan.textproc import AccentPhrase, Word
+
+    w1 = Word("良い", "ヨイ", 2, "形容詞", "自立", t_start=0.5, t_end=0.9)
+    w2 = Word("天気", "テンキ", 3, "名詞", "一般", t_start=0.9, t_end=1.4)
+    w3 = Word("です", "デス", 2, "助動詞", "*", t_start=1.4, t_end=1.7)
+    ap = AccentPhrase(index=0, words=[w1, w2, w3], mora_count=7)
+    ap.t_start, ap.t_end = 0.5, 1.7
+    points = dict(tobi.bi_points([ap]))
+    assert points[0.9] == "1"      # ヨイ | テンキデス の文節境界
+    assert 1.4 not in points       # 天気+です は同一文節(語境界は対象外)
+    assert points[1.7] == "3"      # 発話末
 
 
 def _times_grid(t0, t1):
@@ -144,7 +160,9 @@ def test_write_xjtobi_textgrid(aps_with_times, tmp_path):
     pred_labels = [e.label for e in tg.getTier("words_pred").entries]
     assert all("/" in lab for lab in pred_labels)  # 辞書型 /N が付いている
     words = [e.label for e in tg.getTier("words").entries]
-    assert "ヤマナシダ'イガク" in words
+    # 単位は文節: 山梨大学+で が 1 区間になり、核記号が入る
+    assert "ヤマナシダ'イガクデ" in words
+    assert "ワタシワ'" in words  # 私+は も 1 文節
     bi_labels = [e.label for e in tg.getTier("BI").entries]
     assert set(bi_labels) <= {"1", "2", "3"}
     assert "3" in bi_labels
@@ -341,7 +359,9 @@ def test_peak_excl_bpm_nan_without_segments(aps_with_times):
 
 
 def test_word_accent_rows_roundtrip(aps_with_times, tmp_path):
-    """未修正なら realized == predicted で全語 match になる。"""
+    """未修正なら realized == predicted で全文節 match になる。"""
+    from pitchan.textproc import bunsetsu_groups
+
     aps = aps_with_times
     dur = aps[-1].t_end + 0.5
     phones = [(w.t_start, w.t_end, "a") for ap in aps for w in ap.words]
@@ -352,17 +372,17 @@ def test_word_accent_rows_roundtrip(aps_with_times, tmp_path):
 
     laps, _ = tobi.parse_xjtobi_textgrid(path)
     rows = tobi.word_accent_rows(laps, "wa")
-    assert len(rows) == sum(len(ap.words) for ap in aps)
+    assert len(rows) == sum(len(bunsetsu_groups(ap)) for ap in aps)
     assert all(r["accent_match"] == "match" for r in rows)
     assert all(r["realized_accent"] == r["predicted_accent"] for r in rows)
-    # 山梨大学 の辞書型が取得できている(単独でも有核)
-    yama = next(r for r in rows if r["word_kana"] == "ヤマナシダイガク")
+    # 山梨大学で(文節)の辞書型が取得できている(単独でも有核)
+    yama = next(r for r in rows if r["bunsetsu_kana"] == "ヤマナシダイガクデ")
     assert yama["lexical_accent"] is not None and yama["lexical_accent"] > 0
     assert yama["realized_accent"] == 5
 
 
 def test_word_accent_rows_detects_edits(aps_with_times, tmp_path):
-    """核の削除・移動・追加が deleted / shifted / inserted になる。"""
+    """核の削除・移動の手修正が deleted / shifted として検出される。"""
     from praatio import textgrid as ptg
 
     aps = aps_with_times
@@ -378,22 +398,21 @@ def test_word_accent_rows_detects_edits(aps_with_times, tmp_path):
     entries = [(e.start, e.end, e.label) for e in tg.getTier("words").entries]
     edited = []
     for s, e, lab in entries:
-        if lab == "ワ'":
-            lab = "ワ"                      # 核の削除
-        elif lab == "ヤマナシダ'イガク":
-            lab = "ヤマナ'シダイガク"        # 核の移動 5→3
-        elif lab == "デ":
-            lab = "デ'"                      # 核の追加
+        if lab == "ワタシワ'":
+            lab = "ワタシワ"                    # 核の削除(平板化)
+        elif lab == "ヤマナシダ'イガクデ":
+            lab = "ヤマナ'シダイガクデ"          # 核の移動 5→3
         edited.append((s, e, lab))
     tg.replaceTier("words", ptg.IntervalTier("words", edited, 0, tg.maxTimestamp))
     tg.save(str(path), format="long_textgrid", includeBlankSpaces=True)
 
     laps, _ = tobi.parse_xjtobi_textgrid(path)
-    rows = {r["word_kana"]: r for r in tobi.word_accent_rows(laps, "we")}
-    assert rows["ワ"]["accent_match"] == "deleted"
-    assert rows["ヤマナシダイガク"]["accent_match"] == "shifted"
-    assert rows["ヤマナシダイガク"]["realized_accent"] == 3
-    assert rows["デ"]["accent_match"] == "inserted"
+    rows = {r["bunsetsu_kana"]: r for r in tobi.word_accent_rows(laps, "we")}
+    assert rows["ワタシワ"]["accent_match"] == "deleted"
+    assert rows["ヤマナシダイガクデ"]["accent_match"] == "shifted"
+    assert rows["ヤマナシダイガクデ"]["realized_accent"] == 3
+    # 核の追加(予測 0 → 実現あり)は inserted
+    assert tobi._accent_match(realized=2, predicted=0) == "inserted"
 
 
 def test_write_accent_textgrid(aps_with_times, tmp_path):

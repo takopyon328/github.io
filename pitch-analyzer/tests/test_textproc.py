@@ -42,3 +42,18 @@ def test_read_text_file_encodings(tmp_path):
         p.write_text("私は学生です。", encoding=enc)
         aps = analyze_text_file(str(p))
         assert "".join(ap.kana for ap in aps) == "ワタシワガクセーデス"
+
+
+def test_bunsetsu_groups():
+    from pitchan.textproc import bunsetsu_groups
+
+    aps = analyze_text("私は良い天気の日に研究しています。")
+    kanas = [
+        "".join(w.pron for w in g) for ap in aps for g in bunsetsu_groups(ap)
+    ]
+    # 私は / 良い / 天気の日に(非自立名詞は付属)/ 研究しています(サ変+する)
+    assert "ワタシワ" in kanas
+    assert "テンキノヒニ" in kanas
+    assert "ケンキューシテイマス" in kanas
+    # 付属語だけの文節は生じない
+    assert "ワ" not in kanas and "ニ" not in kanas

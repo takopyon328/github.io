@@ -177,7 +177,7 @@ low_confidence が付き、ログに警告が出ます)。
 | `<名前>_frames.csv` | 5ms ごとの F0(生値 Hz・半音値・z スコア・所属句) |
 | `<名前>_ap_contours.csv` | 各句の F0 を等間隔 30 点にした時間正規化輪郭(形状比較用) |
 | `<名前>.json` | 全情報の構造化データ(正規化パラメータの記録つき) |
-| `<名前>.TextGrid` | Praat 用(accent_phrases / words / phones 層)。境界の目視確認に |
+| `<名前>.TextGrid` | Praat 用(accent_phrases / **bunsetsu**(文節)/ words / phones 層)。境界の目視確認に |
 | `<名前>_xjtobi.TextGrid` | 簡易版 X-JToBI 下書き(§7) |
 | `<名前>_ap_plots\` | 句ごとの F0 図。ファイル名は `ap0001_ヤマナシダイガクデ.png` |
 | `<名前>_f0.png` | ファイル全体の F0 図(`--plot` 指定時) |
@@ -226,9 +226,9 @@ low_confidence が付き、ログに警告が出ます)。
 |---|---|---|
 | `segments` | 音素区間 | 通常不要 |
 | `tones` | %L / H- / H*+L(予測の近似位置)と句末 L%(+BPM 自動判定を連結。例 `L%LH%`) | BPM の追加・修正 |
-| `words` | カナ単語+**アクセント核記号 `'`**(例 `ヤマナシダ'イガク`) | **核の移動・削除・追加はここ** |
-| `words_pred` | words の予測の凍結コピー+語の辞書型(例 `…/5`) | **編集禁止**(対照の基準) |
-| `BI` | 1=語 / 2=アクセント句 / 3=イントネーション句境界 | 句切りの修正 |
+| `words` | **文節単位**(自立語+付属語)のカナ+**アクセント核記号 `'`**(例 `ヤマナシダ'イガクデ`) | **核の移動・削除・追加はここ** |
+| `words_pred` | words の予測の凍結コピー+文節の辞書型(例 `…/5`) | **編集禁止**(対照の基準) |
+| `BI` | 1=文節 / 2=アクセント句 / 3=イントネーション句境界 | 句切りの修正 |
 
 **(2) Praat で手修正** — 音声と一緒に開き、実際の発話に合わせて words 層の核記号・
 BI・tones の BPM を直す。境界を多少ドラッグしてもポイントの対応付けは自動で追従
@@ -244,8 +244,8 @@ pitchan xjtobi-measure --wav X.wav --textgrid X_xjtobi.TextGrid --out results\me
 
 - `X_xjtobi_measures.csv` — 句単位: 修正後の核位置(`nucleus_mora`)・BI・BPM・
   F0 統計・BPM 区間を除いた核ピーク
-- `X_xjtobi_words.csv` — 語単位: **実現型**(修正後の `'` 位置)/ **予測型** /
-  **辞書型**(語単独のアクセント)と `accent_match`
+- `X_xjtobi_words.csv` — 文節単位: **実現型**(修正後の `'` 位置)/ **予測型** /
+  **辞書型**(文節単独のアクセント)と `accent_match`
   (match=一致 / shifted=核位置ずれ / deleted=核脱落 / inserted=核過剰)
 - `X_accent.TextGrid` — 実現アクセント型の層(Praat 確認用)
 

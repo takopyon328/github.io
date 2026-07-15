@@ -99,3 +99,15 @@ def test_flag_low_confidence_f0(aligned_aps):
     assert aps[0].low_confidence      # 有声率
     assert aps[1].low_confidence      # 跳躍
     assert not aps[2].low_confidence  # 正常な句は影響なし
+
+
+def test_textgrid_has_bunsetsu_tier(aligned_aps, tmp_path):
+    from praatio import textgrid as ptg
+
+    aps, total = aligned_aps
+    outputs.write_textgrid(tmp_path / "b.TextGrid", aps, [], total)
+    tg = ptg.openTextgrid(str(tmp_path / "b.TextGrid"), includeEmptyIntervals=False)
+    assert "bunsetsu" in tg.tierNames
+    labels = [e.label for e in tg.getTier("bunsetsu").entries]
+    assert "ワタシワ" in labels          # 私+は = 1 文節
+    assert "ヤマナシダイガクデ" in labels  # 山梨大学+で = 1 文節

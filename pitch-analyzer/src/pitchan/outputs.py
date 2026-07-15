@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from praatio import textgrid as ptg
 
-from .textproc import AccentPhrase
+from .textproc import AccentPhrase, bunsetsu_groups
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,15 @@ def write_textgrid(
         for ap in aps
         if ap.t_start is not None
     ]
+    bunsetsu_entries = [
+        (g[0].t_start, g[-1].t_end, "".join(w.pron for w in g))
+        for ap in aps
+        if ap.t_start is not None
+        for g in bunsetsu_groups(ap)
+        if g[0].t_start is not None
+    ]
     tg.addTier(ptg.IntervalTier("accent_phrases", ap_entries, 0, duration))
+    tg.addTier(ptg.IntervalTier("bunsetsu", bunsetsu_entries, 0, duration))
     tg.addTier(ptg.IntervalTier("words", word_entries, 0, duration))
     if phones:
         tg.addTier(ptg.IntervalTier("phones", phones, 0, duration))

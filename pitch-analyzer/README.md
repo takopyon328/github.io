@@ -81,7 +81,7 @@ pitchan analyze --wav recording.wav --text script.txt --out results/
 | `<name>_ap_summary.csv` | アクセント句単位の要約: 表記・カナ・アクセント型・モーラ数・時刻・平均/最大/最小/レンジ(半音)・ピーク位置比・有声率・信頼度フラグ |
 | `<name>_ap_contours.csv` | 各句の F0 を等間隔 30 点にリサンプルした時間正規化輪郭(半音値)。句の形状比較用 |
 | `<name>.json` | 上記を統合した構造化データ(単語タイミング含む) |
-| `<name>.TextGrid` | Praat で開いて境界を確認・手修正するための TextGrid |
+| `<name>.TextGrid` | Praat で開いて境界を確認・手修正するための TextGrid(tier: accent_phrases / **bunsetsu**(文節)/ words / phones) |
 | `<name>_f0.png` | (`--plot` 時)F0 曲線+句境界の図 |
 
 `results/work/` に MFA の中間ファイル(コーパス・生成辞書・アラインメント結果)が
@@ -135,9 +135,9 @@ margin を付けて音声を切り出し、全 block を 1 つの一時コーパ
 |----|------|------|
 | `segments` | 音素区間 | MFA アラインメント |
 | `tones` | `%L`(イントネーション句頭)・`H-`(句頭上昇。頭高句を除く)・`H*+L`(予測核)・`L%`(句末。BPM 判定があれば `L%H%` のように連結)(ポイント層) | %L/H-/H*+L はテキスト予測の近似位置、BPM は F0 形状の規則判定(ドラフト) |
-| `words` | カナ単語+アクセント核記号 `'`(例: ヤマナシダ'イガク)。**手修正はこの層に対して行う** | テキスト予測(東京方言の規範) |
-| `words_pred` | words の予測の凍結コピー+語の辞書型(例: `ヤマナシダ'イガク/5`)。**編集しない**こと(実現 vs 予測の対照の基準になる) | テキスト予測+語単独の解析 |
-| `BI` | 1=語境界 / 2=アクセント句境界 / 3=イントネーション句境界(ポイント層) | 1・2 はテキスト予測、3 は実ポーズ(0.2 秒以上)で検出 |
+| `words` | **文節単位**(自立語+付属語。アクセント句を構成する最小の枠)のカナ+アクセント核記号 `'`(例: ヤマナシダ'イガクデ)。**手修正はこの層に対して行う** | テキスト予測(東京方言の規範) |
+| `words_pred` | words の予測の凍結コピー+文節の辞書型(例: `ヤマナシダ'イガクデ/5`)。**編集しない**こと(実現 vs 予測の対照の基準になる) | テキスト予測+文節単独の解析 |
+| `BI` | 1=文節境界 / 2=アクセント句境界 / 3=イントネーション句境界(ポイント層) | 1・2 はテキスト予測、3 は実ポーズ(0.2 秒以上)で検出 |
 
 BPM の自動判定は X-JToBI の 4 種すべてに対応しています:
 `H%`(上昇調1)/ `LH%`(上昇調2)/ `HL%`(上昇下降調)/ `HLH%`(上昇下降上昇調)。
@@ -166,10 +166,10 @@ pitchan xjtobi-measure --wav rec.wav --textgrid rec_xjtobi_fixed.TextGrid --out 
 
 あわせて**単語レベルのアクセント対照**も出力されます:
 
-- `<name>_xjtobi_words.csv` — 1 語 1 行:
-  `realized_accent`(実現型: 修正後 words 層の `'` の語内位置。0=核なし)/
+- `<name>_xjtobi_words.csv` — 1 文節 1 行:
+  `realized_accent`(実現型: 修正後 words 層の `'` の文節内位置。0=核なし)/
   `predicted_accent`(予測型: words_pred 層)/
-  `lexical_accent`(辞書型: 語単独のアクセント)/
+  `lexical_accent`(辞書型: 文節単独のアクセント)/
   `accent_match`(`match`=一致 / `shifted`=核位置ずれ / `deleted`=核脱落 / `inserted`=核過剰)
 - `<name>_accent.TextGrid` — 実現アクセント型を語区間ラベルにした `accent_est` 層
   (Praat での目視確認用)

@@ -28,6 +28,7 @@ class Word:
     pron: str  # カタカナ読み(無声化マーク等を除去済み、ヲ→オ正規化済み)
     mora_count: int
     pos: str
+    pos_group1: str = ""  # 品詞細分類(自立 / 非自立 / サ変接続 / 接尾 など)
     t_start: float | None = None
     t_end: float | None = None
 
@@ -125,6 +126,7 @@ def analyze_text(text: str) -> list[AccentPhrase]:
             pron=pron,
             mora_count=f["mora_size"],
             pos=f["pos"],
+            pos_group1=f.get("pos_group1", "") or "",
         )
         if f["chain_flag"] == 1 and aps and not after_pause:
             aps[-1].words.append(word)
@@ -178,6 +180,39 @@ def _read_text_file(path: str) -> str:
 
 
 _SENTENCE_END_RE = re.compile(r"(?<=[。!?!?])")
+
+
+_ATTACH_POS = ("助詞", "助動詞")
+_ATTACH_GROUPS = ("非自立", "接尾")
+_PREFIX_POS = ("接頭詞", "接頭辞")
+
+
+def bunsetsu_groups(ap: AccentPhrase) -> list[list[Word]]:
+    """AP 内の単語列を文節(自立語+付属語)にまとめる。
+
+    付属語(助詞・助動詞)、非自立語・接尾語、接頭辞の直後の語、
+    サ変名詞に続く動詞(研究+し)は直前の文節に付ける。
+    """
+    groups: list[list[Word]] = []
+    for w in ap.words:
+        attach = False
+        if groups:
+            prev = groups[-1][-1]
+            if w.pos in _ATTACH_POS or w.pos_group1 in _ATTACH_GROUPS:
+                attach = True
+            elif prev.pos in _PREFIX_POS:
+                attach = True
+            elif (
+                w.pos == "動詞"
+                and prev.pos == "名詞"
+                and prev.pos_group1 == "サ変接続"
+            ):
+                attach = True
+        if attach:
+            groups[-1].append(w)
+        else:
+            groups.append([w])
+    return groups
 
 
 @lru_cache(maxsize=4096)

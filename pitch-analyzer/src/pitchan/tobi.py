@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 from praatio import textgrid as ptg
 
-from .textproc import AccentPhrase, lexical_accent, split_moras
+from .textproc import AccentPhrase, bunsetsu_groups, lexical_accent, split_moras
 
 logger = logging.getLogger(__name__)
 
@@ -34,41 +34,59 @@ LH_ONSET_RATIO = 0.5  # 上昇開始が最終モーラのこの割合より遅�
 LABEL_MATCH_TOL = 0.15  # [s] 手修正でずれた BI / BPM ポイントを語末・句末に対応付ける許容幅
 
 
-def nucleus_marked_words(ap: AccentPhrase) -> list[str]:
-    """AP 内の各単語のカナに、予測アクセント核の記号 ' を挿入したラベル列を返す。
+def _mark_nucleus(units_kana: list[str], accent_type: int | None) -> list[str]:
+    """カナ単位列に予測アクセント核の記号 ' を挿入したラベル列を返す。
 
-    例: ヤマナシダイガク+デ(5型)→ ["ヤマナシダ'イガク", "デ"]
     平板(0型)・アクセント型不明の場合は記号を付けない。
     """
-    labels = [w.pron for w in ap.words]
-    if not ap.accent_type:  # None(不明)または 0(平板)
+    labels = list(units_kana)
+    if not accent_type:  # None(不明)または 0(平板)
         return labels
-    remaining = ap.accent_type
-    for i, w in enumerate(ap.words):
-        moras = split_moras(w.pron)
+    remaining = accent_type
+    for i, kana in enumerate(units_kana):
+        moras = split_moras(kana)
         if remaining <= len(moras):
             labels[i] = "".join(moras[:remaining]) + "'" + "".join(moras[remaining:])
             return labels
         remaining -= len(moras)
     logger.warning(
-        "AP %d (%s): 予測核位置 %d がモーラ数を超えています",
-        ap.index, ap.kana, ap.accent_type,
+        "%s: 予測核位置 %d がモーラ数を超えています", "".join(units_kana), accent_type
     )
     return labels
+
+
+def nucleus_marked_words(ap: AccentPhrase) -> list[str]:
+    """AP 内の各単語のカナに核記号を挿入したラベル列。
+
+    例: ヤマナシダイガク+デ(5型)→ ["ヤマナシダ'イガク", "デ"]
+    """
+    return _mark_nucleus([w.pron for w in ap.words], ap.accent_type)
+
+
+def nucleus_marked_bunsetsu(
+    ap: AccentPhrase,
+) -> list[tuple[list, str]]:
+    """AP 内の文節ごとの (単語グループ, 核記号付きカナラベル) を返す。
+
+    例: ワタシ+ワ(4型)→ [([私, は], "ワタシワ'")]
+    """
+    groups = bunsetsu_groups(ap)
+    kanas = ["".join(w.pron for w in g) for g in groups]
+    return list(zip(groups, _mark_nucleus(kanas, ap.accent_type)))
 
 
 def bi_points(aps: list[AccentPhrase]) -> list[tuple[float, str]]:
     """BI 層のポイント列 (時刻, ラベル) を返す。
 
-    語境界=1、アクセント句境界=2、実ポーズ(または発話末)を伴う境界=3。
+    文節境界=1、アクセント句境界=2、実ポーズ(または発話末)を伴う境界=3。
     """
     points: list[tuple[float, str]] = []
     for k, ap in enumerate(aps):
         if ap.t_start is None:
             continue
-        for w in ap.words[:-1]:
-            if w.t_end is not None:
-                points.append((w.t_end, "1"))
+        for g in bunsetsu_groups(ap)[:-1]:
+            if g[-1].t_end is not None:
+                points.append((g[-1].t_end, "1"))
         nxt = next(
             (a for a in aps[k + 1:] if a.t_start is not None), None
         )
@@ -285,19 +303,23 @@ def write_xjtobi_textgrid(
     bpm = classify_bpm_all(times, f0_st, phones, aps)
     tg.addTier(ptg.PointTier("tones", tone_points(aps, bpm), 0, duration))
 
+    # 単位は文節(自立語+付属語。アクセント句を構成する最小の枠)
     word_entries = []
     pred_entries = []
     for ap in aps:
         if ap.t_start is None:
             continue
-        for w, label in zip(ap.words, nucleus_marked_words(ap)):
-            word_entries.append((w.t_start, w.t_end, label))
-            lex = lexical_accent(w.surface)
+        for group, label in nucleus_marked_bunsetsu(ap):
+            if group[0].t_start is None:
+                continue
+            t0, t1 = group[0].t_start, group[-1].t_end
+            word_entries.append((t0, t1, label))
+            lex = lexical_accent("".join(w.surface for w in group))
             pred_entries.append(
-                (w.t_start, w.t_end, f"{label}/{lex if lex is not None else '?'}")
+                (t0, t1, f"{label}/{lex if lex is not None else '?'}")
             )
     tg.addTier(ptg.IntervalTier("words", word_entries, 0, duration))
-    # words_pred: 予測(規範)の凍結コピー+辞書型(/N)。手修正の対象外とし、
+    # words_pred: 予測(規範)の凍結コピー+文節の辞書型(/N)。手修正の対象外とし、
     # 修正後の words 層との対照(実現 vs 予測)を 1 ファイルで可能にする
     tg.addTier(ptg.IntervalTier("words_pred", pred_entries, 0, duration))
 
@@ -595,10 +617,10 @@ def _accent_match(realized: int, predicted: int) -> str:
 
 
 def word_accent_rows(aps: list[LabeledAP], file_name: str) -> list[dict]:
-    """語ごとの実現アクセント型と予測・辞書型の対照行を返す。
+    """文節ごとの実現アクセント型と予測・辞書型の対照行を返す。
 
-    実現型 = 修正後 words 層の核記号位置(語内モーラ番号、0=核なし)。
-    予測型 = words_pred 層(OpenJTalk の文脈予測)。辞書型 = 語単独の型。
+    実現型 = 修正後 words 層(文節単位)の核記号位置(文節内モーラ番号、0=核なし)。
+    予測型 = words_pred 層(OpenJTalk の文脈予測)。辞書型 = 文節単独の型。
     """
     rows = []
     for ap in aps:
@@ -607,8 +629,8 @@ def word_accent_rows(aps: list[LabeledAP], file_name: str) -> list[dict]:
             row: dict = {
                 "file": file_name,
                 "ap_index": ap.index,
-                "word_index": wi,
-                "word_kana": label.replace("'", ""),
+                "bunsetsu_index": wi,
+                "bunsetsu_kana": label.replace("'", ""),
                 "t_start": round(t0, 4),
                 "t_end": round(t1, 4),
                 "realized_accent": realized,

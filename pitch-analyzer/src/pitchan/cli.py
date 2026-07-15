@@ -489,7 +489,7 @@ def run_xjtobi_measure(args) -> None:
     out_path = args.out / f"{args.wav.stem}_xjtobi_measures.csv"
     df.to_csv(out_path, index=False, encoding=enc)
 
-    # 単語レベルの実現アクセント型と予測・辞書型の対照
+    # 文節レベルの実現アクセント型と予測・辞書型の対照
     word_rows = tobi.word_accent_rows(laps, args.wav.stem)
     words_path = args.out / f"{args.wav.stem}_xjtobi_words.csv"
     pd.DataFrame(word_rows).to_csv(words_path, index=False, encoding=enc)
@@ -499,7 +499,7 @@ def run_xjtobi_measure(args) -> None:
     if word_rows and "accent_match" in word_rows[0]:
         n_mismatch = sum(1 for r in word_rows if r["accent_match"] != "match")
         logger.info(
-            "単語アクセント対照: %d 語中 %d 語が予測と不一致 (%s)",
+            "文節アクセント対照: %d 文節中 %d 文節が予測と不一致 (%s)",
             len(word_rows), n_mismatch, words_path.name,
         )
     else:
