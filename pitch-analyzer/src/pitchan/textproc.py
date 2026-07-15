@@ -183,22 +183,30 @@ _SENTENCE_END_RE = re.compile(r"(?<=[。!?!?])")
 
 
 _ATTACH_POS = ("助詞", "助動詞")
-_ATTACH_GROUPS = ("非自立", "接尾")
 _PREFIX_POS = ("接頭詞", "接頭辞")
 
 
 def bunsetsu_groups(ap: AccentPhrase) -> list[list[Word]]:
     """AP 内の単語列を文節(自立語+付属語)にまとめる。
 
-    付属語(助詞・助動詞)、非自立語・接尾語、接頭辞の直後の語、
-    サ変名詞に続く動詞(研究+し)は直前の文節に付ける。
+    直前の文節に付けるもの:
+    - 付属語(助詞・助動詞)、接尾語(〜さん・〜的 など)
+    - 非自立の動詞・形容詞(補助動詞・補助形容詞: 〜て「いる」・〜て「ほしい」)
+    - 接頭辞の直後の語、サ変名詞に続く動詞(研究+し)
+
+    非自立でも**名詞**(形式名詞: 日・こと・とき 等)は自立語として
+    新しい文節を始める(「天気の|日に」)。自らアクセントを担いうる単位のため。
     """
     groups: list[list[Word]] = []
     for w in ap.words:
         attach = False
         if groups:
             prev = groups[-1][-1]
-            if w.pos in _ATTACH_POS or w.pos_group1 in _ATTACH_GROUPS:
+            if w.pos in _ATTACH_POS:
+                attach = True
+            elif w.pos_group1 == "接尾":
+                attach = True
+            elif w.pos_group1 == "非自立" and w.pos != "名詞":
                 attach = True
             elif prev.pos in _PREFIX_POS:
                 attach = True

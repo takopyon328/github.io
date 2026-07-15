@@ -51,9 +51,28 @@ def test_bunsetsu_groups():
     kanas = [
         "".join(w.pron for w in g) for ap in aps for g in bunsetsu_groups(ap)
     ]
-    # 私は / 良い / 天気の日に(非自立名詞は付属)/ 研究しています(サ変+する)
+    # 私は / 良い / 天気の / 日に / 研究しています(サ変+する・補助動詞は付属)
     assert "ワタシワ" in kanas
-    assert "テンキノヒニ" in kanas
+    assert "テンキノ" in kanas
+    assert "ヒニ" in kanas  # 形式名詞「日」は自立語として独立の文節
     assert "ケンキューシテイマス" in kanas
     # 付属語だけの文節は生じない
     assert "ワ" not in kanas and "ニ" not in kanas
+
+
+def test_bunsetsu_groups_dependent_forms():
+    from pitchan.textproc import bunsetsu_groups
+
+    def kanas_of(text):
+        return [
+            "".join(w.pron for w in g)
+            for ap in analyze_text(text)
+            for g in bunsetsu_groups(ap)
+        ]
+
+    # 形式名詞(こと)は独立の文節
+    assert "コトガ" in kanas_of("食べてほしいことがある。")
+    # 補助形容詞(〜てほしい)は付属
+    assert "タベテホシイ" in kanas_of("食べてほしいことがある。")
+    # 助動詞化した「よう」は付属
+    assert "イクヨーデス" in kanas_of("行くようです。")
